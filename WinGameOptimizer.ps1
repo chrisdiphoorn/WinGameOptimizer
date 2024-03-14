@@ -4,34 +4,33 @@
 
 	Set-StrictMode -Version Latest
 
-	Import-Module StartLayout
+	#Import-Module StartLayout
+	[console]::CursorVisible =$False
 
 	# Ensure TLS 1.2 is enabled for HTTPS traffic
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 	# This is usefull to ensure the script has some resiliency and does not jump to any conclusions too quickly...
-	$Sleep_Milliseconds = 500 
-    
+	$Sleep_Milliseconds = 100 
+    $BigSleep_Milliseconds = 1000
+	
 	#This is the LogFile that is used to undo the last run
 	$LogName = "WinGameOptimizer.log"
 	
 	# Special Variables used to collect information
 	$PreviousResults = @()
-	$isXboxRunning = $false
-	$isWIFIRunning = $false
-	$isDomain = (gwmi win32_computersystem).partofdomain
-	$isWindows10 = $false
-	$isWindows11 = $false
-	$isWindows12 = $false
+	$script:isXboxRunning = $false
+	$script:isWIFIRunning = $false
+	$script:isDomain = (gwmi win32_computersystem).partofdomain
+	$script:isWindows10 = $false
+	$script:isWindows11 = $false
+	$script:isWindows12 = $false
 	$script:opt = 1
 	
 	$script:FoundTasks = @() 
 	$script:FoundApps = @() 
-	$script:FoundAllUsersApps = @()
-	$script:FoundPrApps = @() 
 	$script:FoundServices = @() 
-	$script:FoundFamilyNames = @()
-	
+		
 	#Get the Users Security Role on the PC
 	[Security.Principal.WindowsPrincipal]$user = [Security.Principal.WindowsIdentity]::GetCurrent()
 	$isAdmin = $user.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
@@ -100,13 +99,13 @@
 			}
 			
 			if($OsName -like "Microsoft Windows 10*") {
-					$isWindows10 = $true
+					$script:isWindows10 = $true
 			}
 			if($OsName -like "Microsoft Windows 11*") {
-					$isWindows11 = $true
+					$script:isWindows11 = $true
 			}
 			if($OsName -like "Microsoft Windows 12*") {
-					$isWindows12 = $true
+					$script:isWindows12 = $true
 			}
 			
 				
@@ -175,28 +174,28 @@
 	}
 
 	Function Update-RegistryValue($key, $name, $value, [Switch]$Verbose) {
-		if ($Verbose) {Put-String "Updating value $key\$name ... "}
+		if ($Verbose) {Write-Debug "Updating value $key\$name ... "}
 		$oldValue = Get-RegistryValue $key $name
 		if ($oldValue -and ($oldValue -ne $value)) {
-			if ($Verbose) {Put-Line "Changing it from $oldValue to $value."}
+			if ($Verbose) {Write-Debug "Changing it from $oldValue to $value."}
 			Set-RegistryValue $key $name $value
 		} elseif ($oldvalue) {
-			if ($Verbose) {Put-Line "It already contains $value."}
+			if ($Verbose) {Write-Debug "It already contains $value."}
 		} else {
-			if ($Verbose) {Put-Line "Key and/or value does not exist."}
+			if ($Verbose) {Write-Debug "Key and/or value does not exist."}
 		}
 	}
 
 
 	Function Set-RegistryValue($Key, $Name, $Value, $PropertyType="String", [Switch]$Verbose) {
 		if ((Get-RegistryValue $Key $Name) -ne $null) {
-			if ($Verbose) {Put-Line "Setting value $key\$name = $value"}
+			if ($Verbose) {Write-Debug "Setting value $key\$name = $value"}
 			Set-ItemProperty $Key -name $Name -value $Value >$null
 		} else {
 			if (! (Get-Item -ErrorAction SilentlyContinue $key)) {
 			New-RegistryKey $Key -Verbose:$Verbose
 			}
-			if ($Verbose) {Put-Line "Creating value $key\$name = $value"}
+			if ($Verbose) {Write-Debug "Creating value $key\$name = $value"}
 			New-ItemProperty $Key -name $Name -PropertyType $PropertyType -Value $Value >$null
 		}
 		return $null
@@ -211,20 +210,20 @@
 		if (! (Get-Item -ErrorAction SilentlyContinue $parent)) {
 			New-RegistryKey $parent -Verbose:$Verbose
 		}
-		if ($Verbose) {Put-Line "Creating key $key\"}
+		if ($Verbose) {Write-Debug "Creating key $key\"}
 		New-Item $key >$null
 		return $null
 	}
 
 	Function Get-RegistryValue($key, $name, [Switch]$Verbose) {
-		if ($Verbose) {Put-Line "Reading value $key\$name"}
+		if ($Verbose) {Write-Debug "Reading value $key\$name"}
 		$item = Get-ItemProperty -ErrorAction SilentlyContinue $key
 		if ($item) {
 			return $item.$name
 		} else {
 			return $null
 		}
-		}
+	}
 
 
 	Function Format-Size()
@@ -261,19 +260,18 @@
 
 		$result = $True   # Default is that Indexing is currently not enabled
 		
-		$obj = Get-WmiObject -Class Win32_Volume -Filter "DriveLetter='$Drive'"
+		$obj = (Get-WmiObject -Class Win32_Volume -Filter "DriveLetter='$Drive'")
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
 				
 		$indexing = $obj.IndexingEnabled
 		
 		if("$indexing" -eq $True){
 			
-			$obj | Set-WmiInstance -Arguments @{IndexingEnabled=$False} | Out-Null
-			
-			Start-Sleep -Milliseconds $Sleep_Milliseconds
+			$runme= ($obj | Set-WmiInstance -Arguments @{IndexingEnabled=$False} | Out-Null)
+			Start-Sleep -Seconds 2
 			
 			# Check again to ensure it has sucessfully disabled all Drive indexing?
-			$obj = Get-WmiObject -Class Win32_Volume -Filter "DriveLetter='$Drive'"
+			$obj = (Get-WmiObject -Class Win32_Volume -Filter "DriveLetter='$Drive'")
 			Start-Sleep -Milliseconds $Sleep_Milliseconds
 					
 			$indexing = $obj.IndexingEnabled
@@ -317,20 +315,20 @@
 				Start-Sleep -Milliseconds $Sleep_Milliseconds
 			}
 		}
-		Write-Progress -Activity "Completed" -Completed
-		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		Write-Progress -Complete '(unused)'
+		Start-Sleep -Milliseconds $BigSleep_Milliseconds
 	}
 
 	function GET-PrintSpooler {
 		
-		$service = Get-Service -name Spooler 
+		$service = Get-Service -name Spooler -ErrorAction SilentlyContinue
 		$ServiceStatus = $service.Status
 		$ServiceDisplayName = $service.DisplayName
 	
 		$result = $False
 	
 		if ($ServiceStatus -eq 'Running') {
-			$result = $true
+			$result = $True
 		}
 		
 		return $result
@@ -342,7 +340,7 @@
 		
 		Write-Progress -Activity "Disabling Print Spooler." -Status "..."
 		
-		$service = Get-Service -name Spooler 
+		$service = Get-Service -name Spooler -ErrorAction SilentlyContinue
 		$ServiceStatus = $service.Status
 		$ServiceDisplayName = $service.DisplayName
 	
@@ -350,13 +348,13 @@
 	
 		if ($ServiceStatus -eq 'Running') {
         
-			Stop-Service -Name Spooler -Force | Out-Null
+			$ss=(Stop-Service -Name Spooler -Force -NoWait | Out-Null)
 			Start-Sleep -Milliseconds $Sleep_Milliseconds
 		
-			Set-Service -Name Spooler -StartupType 'Disabled' | Out-Null
+			$ss=(Set-Service -Name Spooler -StartupType 'Disabled' | Out-Null)
 			Start-Sleep -Milliseconds $Sleep_Milliseconds
 				
-			$service = Get-Service -name Spooler 
+			$service = (Get-Service -name Spooler -ErrorAction SilentlyContinue)
 			$ServiceStatus = $service.Status
 
 			if ($ServiceStatus -ne 'Running') {
@@ -366,7 +364,7 @@
 			}
 		}
 		
-		Write-Progress -Activity "Completed" -Completed
+		Write-Progress -Complete '(unused)'
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
 		return $result
 	}	
@@ -378,7 +376,7 @@
 	
 	
 	Function write-opt {
-		write-host " $($opt). " -NoNewLine -ForegroundColor Green 
+		write-host " $($script:opt). " -NoNewLine -ForegroundColor Green 
 		$script:opt++
 	}
 	
@@ -398,9 +396,8 @@
 	}
 	
 	function Get-FreeDiskSpace {
-			$OS = Get-WmiObject -Class Win32_OperatingSystem
-			$Disk = Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='$($os.SystemDrive)'" |
-				Select @{Name="FreeGB";Expression={[math]::Round($_.FreeSpace / 1GB, 2)}}
+			$OS = (Get-WmiObject -Class Win32_OperatingSystem)
+			$Disk = (Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='$($os.SystemDrive)'" | Select @{Name="FreeGB";Expression={[math]::Round($_.FreeSpace / 1GB, 2)}})
 			return $Disk.FreeGB
 	}
 		
@@ -416,25 +413,25 @@
 			# Nothing to Report Here?
         }
 
-		Write-Progress -Activity "Running DSM to remove old ServicePack files." -Status "..."
+		Write-Progress -Activity "Running DSM to Remove Old ServicePack Files." -Status "..."
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
 		
 		Try{
+			$ErrorActionPreference = 'SilentlyContinue'
             $DISMResult = dism.exe /online /cleanup-Image /spsuperseded
-            $ErrorActionPreference = 'SilentlyContinue'
         }
 		Catch [System.Exception]{
             $ErrorActionPreference = 'SilentlyContinue'
             $DISMResult = $False
         }
 		
-		Write-Progress -Activity "Removing Old Windows Update Files." -Status "..."
+		Write-Progress -Activity "Removing Old Update Files." -Status "..."
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
 		
-		$isRunning = (Get-Service -Name wuauserv).Status
+		$isRunning = (Get-Service -Name wuauserv -ErrorAction SilentlyContinue).Status
 		
 		Try{
-            Get-Service -Name wuauserv | Stop-Service -Force -ErrorAction Stop
+            $ss=(Get-Service -Name wuauserv -ErrorAction SilentlyContinue| Stop-Service -NoWait -Force -ErrorAction Stop| Out-Null)
             $WUpdateError = $false
         }
         Catch [System.Exception]{
@@ -442,11 +439,11 @@
         }
         Finally{
             If($WUpdateError -eq $False){
-                Get-ChildItem "C:\Windows\SoftwareDistribution\*" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -force -recurse -ErrorAction SilentlyContinue    
-                Get-Service -Name wuauserv | Start-Service
+                $rr=(Get-ChildItem "C:\Windows\SoftwareDistribution\*" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -force -recurse -ErrorAction SilentlyContinue)
+                $ss=(Get-Service -Name wuauserv -ErrorAction SilentlyContinue| Start-Service -ErrorAction SilentlyContinue)
             } Else {
 				if($isRunning = 'Running') {
-					Get-Service -Name wuauserv | Start-Service
+					$ss=(Get-Service -Name wuauserv -ErrorAction SilentlyContinue| Start-Service -ErrorAction SilentlyContinue)
 				}
             }
         }
@@ -457,7 +454,7 @@
 		# Calculate and display the freed disk space
 		$Cleaned = $After - $Before
 
-		Write-Progress -Activity "Completed" -Completed
+		Write-Progress -Complete '(unused)'
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
 		return $Cleaned
 	}
@@ -467,7 +464,7 @@
 		Write-Progress -Activity "Removing Spotify." -Status "..."
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
 				
-		$RunningApp =Get-Process -Name "spotify*"
+		$RunningApp = Get-Process -Name "spotify*"
 		If ($RunningApp){
 			try {
 				$stopit=(Stop-Process -InputObject $RunningApp -Force | Out-Null)
@@ -494,7 +491,7 @@
 				Remove-Item Microsoft.PowerShell.Core\Registry::\$Key\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Spotify -Force -Recurse
 			}
 		}
-		Write-Progress -Activity "Completed" -Completed
+		Write-Progress -Complete '(unused)'
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
 	}
 	
@@ -509,8 +506,8 @@
         "HKCR:\Extensions\ContractId\Windows.BackgroundTasks\PackageId\Microsoft.PPIProjection_10.0.15063.0_neutral_neutral_cw5n1h2txyewy"
         "HKCR:\Extensions\ContractId\Windows.BackgroundTasks\PackageId\Microsoft.XboxGameCallableUI_1000.15063.0.0_neutral_neutral_cw5n1h2txyewy"
         "HKCR:\Extensions\ContractId\Windows.BackgroundTasks\PackageId\Microsoft.XboxGameCallableUI_1000.16299.15.0_neutral_neutral_cw5n1h2txyewy"
-#reg add HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR /f /t REG_DWORD /v "AppCaptureEnabled" /d 0
-#reg add HKEY_CURRENT_USER\System\GameConfigStore /f /t REG_DWORD /v "GameDVR_Enabled" /d 0
+		#reg add HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR /f /t REG_DWORD /v "AppCaptureEnabled" /d 0
+		#reg add HKEY_CURRENT_USER\System\GameConfigStore /f /t REG_DWORD /v "GameDVR_Enabled" /d 0
 
         #Windows File
         "HKCR:\Extensions\ContractId\Windows.File\PackageId\ActiproSoftwareLLC.562882FEEB491_2.6.18.18_neutral__24pqs290vpjk0"
@@ -537,7 +534,7 @@
         
 		#This writes the output of each key it is removing and also removes the keys listed above.
 		ForEach ($Key in $Keys) {
-			Remove-Item $Key -Recurse
+			$rr=(Remove-Item $Key -Recurse| Out-Null)
 		}
 	}
 	
@@ -624,13 +621,38 @@
 		
 		Get-ScheduledTask -TaskPath '\' -TaskName 'OneDrive*' -ea SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
 		
-		Write-Progress -Activity "Completed" -Completed
+		Write-Progress -Complete '(unused)'
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		
+		$sp=(Start-Process "explorer.exe")
+		
 	}
 	
 	Function Remove-PinnedApps {
 		
-		Get-ChildItem "C:\ProgramData\Microsoft\Windows\Start Menu\Programs" -Recurse  -Filter *uninstall*.lnk | ForEach-Object { Remove-Item $_.FullName }   
+		$runme= (Get-ChildItem "C:\ProgramData\Microsoft\Windows\Start Menu\Programs" -Recurse  -Filter *uninstall*.lnk | ForEach-Object { Remove-Item $_.FullName })
+						
+		$RemoveItems = @(
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Microsoft Edge.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessibility\Speech Recognition.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Calculator.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Math Input Panel.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Notepad.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Paint.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Remote Desktop Connection.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Snipping Tool.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Steps Recorder.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Windows Media Player.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Wordpad.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\XPS Viewer.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\System Tools\Character Map.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\System Tools\Windows Server Backup.lnk"
+		)
+		foreach ($Item in $RemoveItems) {
+			IF([System.IO.File]::Exists($Item) -eq $true) {
+				$remove=(Remove-Item $Item | Out-Null)
+			}
+		}
 		
 	}
 	
@@ -670,77 +692,752 @@
 		}
 	}
 	
+	Function Remove-Apps {
 	
-# 	88       888 d8b           .d8888b.                                   .d88888b.           888    d8b               d8b                           
-# 	888   o   888 Y8P          d88P  Y88b                                 d88P" "Y88b          888    Y8P               Y8P                           
-# 	888  d8b  888              888    888                                 888     888          888                                                    
-#	888 d888b 888 888 88888b.  888         8888b.  88888b.d88b.   .d88b.  888     888 88888b.  888888 888 88888b.d88b.  888 88888888  .d88b.  888d888 
-#	888d88888b888 888 888 "88b 888  88888     "88b 888 "888 "88b d8P  Y8b 888     888 888 "88b 888    888 888 "888 "88b 888    d88P  d8P  Y8b 888P"   
-# 	88888P Y88888 888 888  888 888    888 .d888888 888  888  888 88888888 888     888 888  888 888    888 888  888  888 888   d88P   88888888 888     
-# 	8888P   Y8888 888 888  888 Y88b  d88P 888  888 888  888  888 Y8b.     Y88b. .d88P 888 d88P Y88b.  888 888  888  888 888  d88P    Y8b.     888     
-# 	888P     Y888 888 888  888  "Y8888P88 "Y888888 888  888  888  "Y8888   "Y88888P"  88888P"   "Y888 888 888  888  888 888 88888888  "Y8888  888     
-#  	  	                                                                              888                                                             
-#       		                                                                      888                                                             
-#               		                                                              888                                                             
-
-		Clear-Host
-		write-host ""
-		write-host ""
-		write-host ""
-		write-host ""
-		write-host ""
-		write-host ""
-		write-host ""
-		write-host "  _    _ _       _____                       _____       _   _           _              "
-		write-host " | |  | (_)     |  __ \                     |  _  |     | | (_)         (_)             "
-		write-host " | |  | |_ _ __ | |  \/ __ _ _ __ ___   ___ | | | |_ __ | |_ _ _ __ ___  _ _______ _ __ "
-		write-host " | |/\| | | '_ \| | __ / _  | '_   _ \ / _ \| | | | '_ \| __| | '_   _ \| |_  / _ \ '__|"
-		write-host " \  /\  / | | | | |_\ \ (_| | | | | | |  __/\ \_/ / |_) | |_| | | | | | | |/ /  __/ |   "
-		write-host "  \/  \/|_|_| |_|\____/\__,_|_| |_| |_|\___| \___/| .__/ \__|_|_| |_| |_|_/___\___|_|   "
-		write-host "                                                  | |                                   "
-		write-host "                                                  |_|                                   "
-                                                                                             
-		write-host ""
+		$numApps = 0
+		$i = 0
+		$c = $FoundApps.count
+		foreach  ($app in $script:FoundApps) {
+			$i ++
+			$p = ($i / $script:FoundApps.count) * 100
+			Write-Progress "Removing $c Microsoft Apps." -status "$app" -percentComplete $p
+			Start-Sleep -Milliseconds $Sleep_Milliseconds
 			
+			$isappid = $False
+			$pos = $app.IndexOf(".")
+			$posOK = $app.IndexOf(" .")
+			IF($pos -ge 0 -AND $posOK -eq $false ) {$isappid = $true }
+			
+			if($app -like "*_8weky*" -OR $isappid -eq $True) {
+				try {
+					$remove = (winget uninstall -e --id $app --silent --accept-source-agreements)
+					$numApps ++
+				} catch {}
+			} else {
+				try {
+					$remove = (winget uninstall -e --name $app --silent --accept-source-agreements)
+					if ($remove -eq 'Multiple installed packages found matching input criteria. Please refine the input') {
+						$remove = (winget uninstall -e --name $app --exact --silent --accept-source-agreements | Out-Null)
+					}
+					$numApps ++
+				} catch {
+					write-output -f red "Error: "$_.Exception.Message
+				}
+			}
+		}		
+		Write-Progress -Complete '(unused)'
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+			
+	}
+	
+	function winget_outclean () {
+		[CmdletBinding()]
+		param (
+			[Parameter(ValueFromPipeline)]
+			[String[]]$lines
+		)
+		if ($input.Count -gt 0) { $lines = $PSBoundParameters['Value'] = $input }
+		$bInPreamble = $true
+		foreach ($line in $lines) {
+			if ($bInPreamble){
+				if ($line -like "Name*") {
+					$bInPreamble = $false
+				}
+			}
+			if (-not $bInPreamble) {
+				Write-Output $line
+			}
+		}
+	}
+
+	function ConvertFrom-FixedColumnTable {
+		[CmdletBinding()]
+		param(
+		[Parameter(ValueFromPipeline)] [string] $InputObject
+		)
+  
+		begin {
+			Set-StrictMode -Version 1
+			$lineNdx = 0
+		}
+  
+		process {
+			$lines = 
+			if ($InputObject.Contains("`n")) { $InputObject.TrimEnd("`r", "`n") -split '\r?\n' }
+			else { $InputObject }
+			foreach ($line in $lines) {
+			++$lineNdx
+			if ($lineNdx -eq 1) { 
+				# header line
+				$headerLine = $line 
+			}
+			elseif ($lineNdx -eq 2) { 
+				# separator line
+				# Get the indices where the fields start.
+				$fieldStartIndices = [regex]::Matches($headerLine, '\b\S').Index
+				# Calculate the field lengths.
+				$fieldLengths = foreach ($i in 1..($fieldStartIndices.Count-1)) { 
+				$fieldStartIndices[$i] - $fieldStartIndices[$i - 1] - 1
+			}
+			# Get the column names
+			$colNames = foreach ($i in 0..($fieldStartIndices.Count-1)) {
+			if ($i -eq $fieldStartIndices.Count-1) {
+				$headerLine.Substring($fieldStartIndices[$i]).Trim()
+			} else {
+				$headerLine.Substring($fieldStartIndices[$i], $fieldLengths[$i]).Trim()
+			}
+        } 
+      }
+      else {
+        # data line
+        $oht = [ordered] @{} # ordered helper hashtable for object constructions.
+        $i = 0
+        foreach ($colName in $colNames) {
+          $oht[$colName] = 
+            if ($fieldStartIndices[$i] -lt $line.Length) {
+              if ($fieldLengths[$i] -and $fieldStartIndices[$i] + $fieldLengths[$i] -le $line.Length) {
+                $line.Substring($fieldStartIndices[$i], $fieldLengths[$i]).Trim()
+              }
+              else {
+                $line.Substring($fieldStartIndices[$i]).Trim()
+              }
+            }
+          ++$i
+        }
+        # Convert the helper hashable to an object and output it.
+        [pscustomobject] $oht
+      }
+    }
+	}
+  
+	}
+	
+	Function CheckApps {
+		
+		$apps = @(
+					
+			"Microsoft Clipchamp"
+			"Microsoft Edge Update"
+			"Microsoft Edge WebView2 Runtime"
+            "Microsoft.Edge"                  
+            "Cortana"
+            "News"
+			"MSN Weather"
+            "Get Help"                      
+            "Microsoft Tips"
+			"HEIF Image Extensions"
+            "Microsoft 365 (Office)"
+            "Solitaire & Casual Games"
+			"Microsoft Solitaire Collection"
+            "Microsoft Sticky Notes"              
+            "Paint"
+			"Microsoft People"
+            "Power Automate"
+            "Raw Image Extension"
+            "Snipping Tool"
+            "Windows Security"
+            "Microsoft Engagement Framework"
+            "Store Experience Host"
+            "Microsoft To Do"
+            "Web Media Extensions"
+            "Webp Image Extensions"
+            "Dev Home"
+            "Microsoft Photos"
+            "Windows Clock"
+            "Windows Calculator"
+            "Windows Camera"                   
+            "Feedback Hub"
+            "Windows Maps"
+            "Windows Notepad"
+            "Windows Sound Recorder"
+			"Windows Terminal"
+			"Phone Link"                  		
+			"Windows Media Player"
+			"Films & TV"
+			"Quick Assist"                      		
+			"Microsoft Teams"
+			"Windows Web Experience Pack"
+			"Microsoft OneDrive"
+			"Mail and Calendar"
+			"Microsoft Update Health Tools"
+			"Mixed Reality Portal"
+			"Microsoft News"
+			"Microsoft Pay"
+			"Spotify Music"
+			"Teams Machine-Wide Installer"
+			"Microsoft Whiteboard"
+			"Windows Voice Recorder"
+			
+			#Windows 10
+			"Snip & Sketch"
+			"Movies & TV"
+			"Skype"
+			"Paint 3D"
+			"3D Viewer"
+			"OneNote for Windows 10"
+			"paint.net"
+			
+			# Other Tools
+			"SharedAccess"
+			"Windows Calculator"
+			"Windows Clock"
+			"Windows Alarms & Clock"
+			"DevHome"
+			"Windows PC Health Check"
+			"HP Desktop Support Utilities"
+			"HP Notifications"
+			"VP9 Video Extensions"
+		)
+		
+
+		if ($script:isXboxRunning -eq $false) {
+			$apps += @("Xbox", "Game Bar", "Xbox Console Companion", "Xbox Game Speech Window", "Xbox Accessories", "Xbox Identity Provider", "Xbox Game Speech Window" , "Xbox TCUI", "Xbox Game Bar Plugin")
+		}
+		
+		$c = $apps.count
+		Write-Progress "Gathering $c Microsoft Store Apps." 
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		$numApps = 0
+		$i = 0
+
+		$useWinget = $false
+		
+		try {
+			$check=(winget --version) 
+			$useWinGet = $true
+		} catch {
+			$useWinGet = $False
+		}
+
+		if ($useWinGet -eq $False) {
+			Write-Progress "Downloading and installing WinGet which is used to manage aplications in Windows." 
+			Start-Sleep -Milliseconds $Sleep_Milliseconds
+			$progressPreference = 'silentlyContinue'
+			
+			$latestWingetMsixBundleUri = $(Invoke-RestMethod https://api.github.com/repos/microsoft/winget-cli/releases/latest).assets.browser_download_url | Where-Object {$_.EndsWith(".msixbundle")}
+			$latestWingetMsixBundle = $latestWingetMsixBundleUri.Split("/")[-1]
+			
+			Invoke-WebRequest -Uri $latestWingetMsixBundleUri -OutFile "./$latestWingetMsixBundle"
+			Invoke-WebRequest -Uri https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx -OutFile Microsoft.VCLibs.x64.14.00.Desktop.appx
+			Add-AppxPackage Microsoft.VCLibs.x64.14.00.Desktop.appx
+			Add-AppxPackage $latestWingetMsixBundle
+			Start-Sleep -Seconds 2
+			
+			try {
+				$check=(winget --version)
+				$useWinGet = $True
+			} catch {
+				$useWinGet = $False
+			}
+			Write-Progress -Complete '(unused)'
+			Start-Sleep -Milliseconds $Sleep_Milliseconds
+		}
+		
+		$numApps = 0
+		
+		if($useWinget -eq $True) {
+			
+			[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new() 
+			$winget= (winget list | winget_outclean |  ConvertFrom-FixedColumnTable |  Sort-Object Id  |  Select-Object Name,Id,@{N='Version';E={$_.Version.Replace("> ","")}},Available,Source )# Version fixup
+			$i = 0
+			
+			if($winget) {
+				$c = $winget.count
+					foreach($app in $winget) {
+						$AppID = $($app.Id)
+						$AppName = $($app.Name)
+						$i++
+						$p = ($i / $c) * 100
+						Write-Progress "Searching through $c Apps. $([int]$p)% Complete." -Status $AppName -percentComplete $p
+						Start-Sleep -Milliseconds $Sleep_Milliseconds
+			
+						#Part of the ID is missing..... So lets try and remove the crap and add the ID part backon again
+						if($appID -like "*...") {
+							if($appID -like "*_8weky*") {
+								$pos = $appID.IndexOf("_8weky")
+								if($pos) {
+									$appID = $appID.SubString(0,$pos) + "_8wekyb3d8bbwe"
+								}
+							}
+						}
+						
+						if($apps -contains $AppName) {
+							$script:FoundApps += $appName
+							$numApps ++
+						} elseif($apps -contains $AppID) {
+							$script:FoundApps += $appID
+							$numApps ++
+						}
+					}
+			}
+			
+			Write-Progress -Complete '(unused)'
+			Start-Sleep -Milliseconds $Sleep_Milliseconds
+			
+		}
+		
+		if($numApps -gt 0) {
+			write-opt
+			write-host " $numApps Microsoft Store Apps will be Removed." -ForegroundColor White 
+		}
+		
+	}
+	
+	Function Remove-InternetExplorer {
+		
+		#If 21H1
+		#$Runme=(Remove-WindowsCapability -Name 'Browser.InternetExplorer~~~~0.0.11.0' -Online)
+		
+		#$runme=(dism /online /Remove-Capability /CapabilityName:Browser.InternetExplorer~~~~0.0.11.0)
+		#$runme=(Disable-WindowsOptionalFeature -FeatureName Internet-Explorer-Optional-amd64 –Online)
+		
+	}
+	
+	Function Remove-App-RegistryEntries {
+
+		# Advertiser Id
+		$RegistryPath = (Get-Item -Path Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo)
+		IF($RegistryPath) {
+			Set-ItemProperty -Path  $RegistryPath.name -Name "Enabled" -Value "0"
+		}
+		# Chat
+		$RegistryPath = (Get-Item -Path Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced)
+		IF($RegistryPath) {
+			Set-ItemProperty -Path $RegistryPath.name -Name "TaskbarMn" -Value "0"
+		}
+		# Edge Desktop Search Bar
+		$RegistryPath = (Get-Item -Path Registry::HKLM\SOFTWARE\Policies\Microsoft\Edge)
+		IF($RegistryPath) {
+			Set-ItemProperty -Path $RegistryPath.name -Name "WebWidgetAllowed" -Value "0" | Out-Null
+		}
+		# EdgeRecommendations
+		$RegistryPath = Get-Item -Path Registry::HKLM\SOFTWARE\Policies\Microsoft\Edge | Out-Null
+		IF($RegistryPath) {
+			Set-ItemProperty -Path $RegistryPath.name -Name "ShowRecommendationsEnabled" -Value "0" | Out-Null
+		}
+		# Hide File Extension
+		Set-ItemProperty -Path "Registry::HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced"`
+                 -Name "HideFileExt"`
+                 -Value "0"
+		# RotatingLockScreenOverlay
+		Set-ItemProperty -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"`
+                 -Name "RotatingLockScreenOverlayEnabled"`
+                 -Value "0"
+				 
+		# SubscribedContent-338387Enabled
+		Set-ItemProperty -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"`
+                 -Name "SubscribedContent-338387Enabled"`
+                 -Value "0"
+		
+		# PowershellUnrestricted
+		# Set-ItemProperty -Path "Registry::HKLM\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell"`
+        #         -Name "ExecutionPolicy"`
+        #         -Value "Unrestricted"		
+		
+		#StartupBoost
+		$RegistryPath = (Get-Item -Path Registry::HKLM\SOFTWARE\Policies\Microsoft\Edge)
+		IF($RegistryPath) {
+			Set-ItemProperty -Path $RegistryPath.name -Name "StartupBoostEnabled" -Value "0" | Out-Null
+		}
+		#StartMenuRecommendations
+		$RegistryPath = (Get-Item -Path Registry::HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer)
+		IF($RegistryPath) {
+			Set-ItemProperty -Path $RegistryPath.name -Name "HideRecommendedSection" -Value "1" | Out-Null
+		}
+		# TaskBar search
+		Set-ItemProperty -Path "Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Search"`
+                 -Name "SearchboxTaskbarMode"`
+                 -Value "0"
+		# TaskView
+		Set-ItemProperty -Path "Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"`
+                 -Name "ShowTaskViewButton"`
+                 -Value "0"
+		# Startmenu Web search
+		$RegistryPath = (Get-Item -Path Registry::HKCU\SOFTWARE\Policies\Microsoft\Windows\Explorer)
+		IF($RegistryPath) {
+			Set-ItemProperty -Path $RegistryPath.name -Name "DisableSearchBoxSuggestions" -Value "1" | Out-Null
+		}
+		# Widgets
+		Set-ItemProperty -Path "Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"`
+                 -Name "TaskbarDa"`
+                 -Value "0"
+		# No Customize This folder
+		Set-ItemProperty -Path "Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer"`
+                 -Name "NoCustomizeThisFolder"`
+                 -Value "1"
+		# Allow Dev
+		Set-ItemProperty -Path "Registry::HKLM\SOFTWARE\Policies\Microsoft\Windows\Appx"`
+                 -Name "AllowDevelopmentWithoutDevLicense"`
+                 -Value "1"
+		#Remove Edge Bing Sidebar
+		$RegistryPath = (Get-Item -Path Registry::HKLM\SOFTWARE\Policies\Microsoft\Edge)
+		IF($RegistryPath) {
+			Set-ItemProperty -Path $RegistryPath.name -Name "HubsSidebarEnabled" -Value "0" | Out-Null
+		}
+		#ExplorerClassicMenu				 
+		#ON# New-Item -Path "Registry::HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -Value ""
+		#OFF# Remove-Item -Path "Registry::HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32"
+		
+		#Explorer Give access
+		#Set-ItemProperty -Path "Registry::HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked"`
+        #         -Name "{f81e9010-6ea4-11ce-a7ff-00aa003ca9f6}"`
+        #         -PropertyType "String"`
+        #         -Value ""
+				 
+		#Remove OfficeCloud Files in Explorer = asking to Sign In
+		$RegistryPath = (Get-Item -Path Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer)
+		IF($RegistryPath) {
+			Set-ItemProperty -Path $RegistryPath.name -Name "ShowCloudFilesInQuickAccess" -Value "0" | Out-Null
+		}
+		
+	}
+	
+	Function Remove-services {
+	
+		$numServices = 0
+		$i = 0
+		$c= $script:FoundServices.count
+		Write-Progress "Disabling $c Services" 
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		foreach ($service in $script:FoundServices) {
+				$foundservice = $null
+				$i++
+				$p = ($i / $script:FoundServices.count) * 100
+				Write-Progress "Disabling $c Services" -Status "$([int]$p)% Complete." -percentComplete $p
+				Start-Sleep -Milliseconds $Sleep_Milliseconds	
+
+				try {
+						Stop-Service -Name "$($service)" -Force -NoWait | Out-Null
+						Start-Sleep -Milliseconds $Sleep_Milliseconds
+				} catch {
+						write-output -f red "Error: "$_.Exception.Message
+				}
+				try {
+						Set-Service -Name "$($service)" -StartupType Disabled | Out-Null
+						Start-Sleep -Milliseconds $Sleep_Milliseconds
+				} catch {
+						write-output -f red "Error: "$_.Exception.Message
+				}
+				$numServices ++
+								
+			}
+			Write-Progress -Complete '(unused)'
+			Start-Sleep -Milliseconds $Sleep_Milliseconds
+	}
+	
+	Function CheckServices {
+		
+		$services = @(
+			"diagnosticshub.standardcollector.service" # Microsoft (R) Diagnostics Hub Standard Collector Service
+			"DiagTrack"                                # Diagnostics Tracking Service
+			"dmwappushservice"                         # WAP Push Message Routing Service (see known issues)
+			"lfsvc"                                    # Geolocation Service
+			"MapsBroker"                               # Downloaded Maps Manager
+			"NetTcpPortSharing"                        # Net.Tcp Port Sharing Service
+			"RemoteAccess"                             # Routing and Remote Access
+			"RemoteRegistry"                           # Remote Registry
+			"SharedAccess"                             # Internet Connection Sharing (ICS)
+			"TrkWks"                                   # Distributed Link Tracking Client
+			"WbioSrvc"                                 # Windows Biometric Service (required for Fingerprint reader / facial detection)
+			"ALG"						               # Application Layer Gateway Service
+			"WMPNetworkSvc"                            # Windows Media Player Network Sharing Service
+			"AJRouter"								   # Enables you to connect to Lot Devices, Smart Lights, Smart TV's
+			"AssignedAccessManager"					   # Helps Settingup Kiosk mode 
+			"DPS"									   # Diagnostic Policy Service   - Waiting for Service to Stop 
+			"WdiServiceHost"						   # Diagnostic Service Host
+			"WdiSystemHost"							   # Diagnostic Service System
+			"PrintNotify"							   # Print Notify Service
+			"UmRdpService"							   # Remote Desktop Services UserMode Port Redirector
+			"SessionEnv"							   # Remote Desktop Configuration
+			"TermService"							   # Remote Desktop Services
+			"SensrSvc"								   # Sensor Monitoring Service
+			"SensorService"						       # Sensor Service
+			"SCardSvr"						           # Smart Card
+			"ScDeviceEnum"							   # Smart Card Device Enumeration Service
+			"SCPolicySvc"							   # Smart Card Removal Policy
+			"WerSvc"								   # Windows Error Reporting Service
+			"workfolderssvc"						   # Windows Work Folders
+			"PcaSvc"								   # Program compatability Monitor    - Waiting for Service to Stop
+			"wisvc"									   # Windows Insider Service
+			"WSearch"								   # Windows Search
+			
+			"WpcMonSvc"								   # Windows Parental Controls
+			#"wscsvc"                                  # Windows Security Center Service
+			#"ndu"                                     # Windows Network Data Usage Monitor - OS = Waits to Stop 
+			#"WlanSvc"                                 # WLAN AutoConfig (Disabling this can cause issues with wifi connectivity)
+			# Services which cannot be disabled
+			#"WdNisSvc"
+			
+			#More Services
+			"HpTouchpointAnalyticsService"
+			"HPAppHelperCap"
+			"HPDiagsCap"
+			"HPSysInfoCap"
+			"hpsvcsscan"
+			"HotKeyServiceDSU"
+			
+		)
+		
+		if ($script:isXboxRunning -eq $false) {
+			$services += @("XblAuthManager", "XblGameSave", "XboxNetApiSvc", "XboxGipSvc")
+		}
+		if ($script:isDomain -eq $false) {
+			$services += @("NetLogon")
+		}
+		if($script:isWindows11 -eq $true) {
+			$services += @("TabletInputService")				   # Touch Keyboard and Handwriting Panel Service (ONLY WIn 11)
+		}
+		
+		$c = $services.count
+		$numServices = 0
+		$i = 0
+		Write-Progress "Gathering $c Services." 
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		$AllServices =(Get-Service | Select-Object Name, StartType, Status)
+		$c = $AllServices.count
+		foreach ($service in $AllServices) {
+			$i++
+			$p = ($i / $AllServices.count) * 100
+			$sname = ($service.Name)
+			Write-Progress "Searching through $c Services. $([int]$p)% Complete." -Status  "$sname" -percentComplete $p
+			Start-Sleep -Milliseconds $Sleep_Milliseconds
+			
+			$stype = ($service.StartType)
+			
+			if($services -contains $sname) {
+				if($stype -ne 'Disabled') {
+					$numServices ++
+					$script:FoundServices += $service
+				}
+			}
+		}
+		
+		Write-Progress -Complete '(unused)'
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		
+		if($numServices -gt 0) {
+			write-opt
+			write-host " $numServices Services will be Disabled." -ForegroundColor White 
+		}
+
+
+	}
+
+	Function Kill-Apps {
+		$killprocesses = @(
+		"SearchApp"
+		"SearchUI.exe"
+		)
+		foreach($killme in $killprocesses) {
+			$killl = (taskkill /F /IM $killme | Out-Null)
+		}
+	}
+	
+	Function Remove-Tasks {
+		$numTasks = 0
+		$i =0
+		$c = $FoundTasks.count
+		Write-Progress "Removing $c Tasks" 
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		foreach ($task in $script:FoundTasks) {
+			$aTask = $null
+			$parts = $task.split('\')
+			$name = $parts[-1]
+			$path = $parts[0..($parts.length-2)] -join '\'
+			$path += "\"
+			$i++
+			$p = ($i / $script:FoundTasks.count) * 100
+			Write-Progress "Removing Tasks" -Status "$([int]$p)% Complete." -percentComplete $p
+			try {
+				$aTask = (Get-ScheduledTask -TaskName "$($name)" -TaskPath "$($path)" -ErrorAction SilentlyContinue)
+			} catch {}
+			if($aTask -ne $null) {
+				try {
+					$disable=(Disable-ScheduledTask -TaskName "$($name)" -TaskPath "$($path)" -ErrorAction SilentlyContinue)
+				} catch {
+					write-output "Error: "$_.Exception.Message
+				}
+				try {
+					$disable=(Unregister-ScheduledTask -TaskName "$($name)" -TaskPath "$($path)" -Confirm:$false -ErrorAction SilentlyContinue)
+					Start-Sleep -Milliseconds $Sleep_Milliseconds
+					$numTasks ++
+				} catch {
+					write-output "Error: "$_.Exception.Message
+				}
+			}
+		}
+		Write-Progress -Complete '(unused)'
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+	}
+	
+	Function CheckTasks {
+	
+		$tasks = @(
+			# Windows base scheduled tasks
+			"\MicrosoftEdgeUpdateTaskMachineCore"
+			"\MicrosoftEdgeUpdateTaskMachineUA"
+			"\Microsoft\VisualStudio\Updates\BackgroundDownload"
+			"\Microsoft\Windows\.NET Framework\.NET Framework NGEN v4.0.30319"
+			"\Microsoft\Windows\.NET Framework\.NET Framework NGEN v4.0.30319 64"
+			"\Microsoft\Windows\.NET Framework\.NET Framework NGEN v4.0.30319 64 Critical"
+			"\Microsoft\Windows\.NET Framework\.NET Framework NGEN v4.0.30319 Critical"
+			"\Microsoft\Windows\AppID\SmartScreenSpecific"
+			"\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser"
+			"\Microsoft\Windows\Application Experience\PcaPatchDbTask"
+			"\Microsoft\Windows\Application Experience\ProgramDataUpdater"
+			"\Microsoft\Windows\Application Experience\StartupAppTask"
+			"\Microsoft\Windows\Autochk\Proxy"
+			"\Microsoft\Windows\CloudExperienceHost\CreateObjectTask"
+			"\Microsoft\Windows\Customer Experience Improvement Program\Consolidator"
+			"\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask"
+			"\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip"
+			"\Microsoft\Windows\Defrag\ScheduledDefrag"
+			"\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector"
+			"\Microsoft\Windows\Feedback\Siuf\DmClient"
+			"\Microsoft\Windows\Mobile Broadband Accounts\MNO Metadata Parser"
+			#"\Microsoft\Windows\Windows Defender\Windows Defender Cache Maintenance"
+			#"\Microsoft\Windows\Windows Defender\Windows Defender Cleanup"
+			#"\Microsoft\Windows\Windows Defender\Windows Defender Scheduled Scan"
+			#"\Microsoft\Windows\Windows Defender\Windows Defender Verification"
+			"\Microsoft\Windows\Windows Error Reporting\QueueReporting"
+		)
+		
+		$c = $tasks.count
+		$numTasks = 0
+		$i =0
+		Write-Progress "Gathering $c Tasks." 
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		$AllTasks = (Get-ScheduledTask | Select-Object TaskName, TaskPath, State)
+		$c = $AllTasks.count
+		
+		foreach ($task in $AllTasks) {
+			#$parts = $task.split('\')
+			#$name = $parts[-1]
+			#$path = $parts[0..($parts.length-2)] -join '\'
+			#$path += "\"
+			$i++
+			
+			$p = ($i / $c) * 100
+			
+			$tname = ($task.TaskName)
+			$tstate = ($task.State)
+			$tpath= ($task.TaskPath)
+			
+			Write-Progress "Searching through $c Tasks. $([int]$p)% Complete." -Status $tname -percentComplete $p
+			Start-Sleep -Milliseconds $Sleep_Milliseconds
+			
+			if($tasks -contains $tname) {
+				if($tstate -ne 'Disabled') { 
+					$numTasks ++	
+					$script:FoundTasks += $tname
+				}
+			}
+		}
+		
+		Write-Progress -Complete '(unused)'
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		
+		if($numTasks -gt 0) {
+			write-opt
+			write-host " $numTasks Scheduled Tasks will be Disabled." -ForegroundColor White 
+		}	
+	}
+	
+	Function CreateSystemRestore-Point {
+		
+		Write-Progress -Activity "Creating System Restore." -Status "..."
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		
+		$laststatus = (Get-ComputerRestorePoint -LastStatus)
+		
+		try {
+			Enable-ComputerRestore -Drive "C:\" -Confirm:$False -ErrorAction SilentlyContinue | Out-Null
+			Start-Sleep -Milliseconds $Sleep_Milliseconds
+		} catch {}
+		
+		
+		Checkpoint-Computer -Description "WinGameOptimizer" -RestorePointType "MODIFY_SETTINGS"
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		
+		Write-Progress -Complete '(unused)'
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		
+	}
+	
+	
+	<#
+	# 	88       888 d8b           .d8888b.                                   .d88888b.           888    d8b               d8b                            
+	# 	888   o   888 Y8P          d88P  Y88b                                 d88P" "Y88b          888    Y8P               Y8P                           
+	# 	888  d8b  888              888    888                                 888     888          888                                                    
+	#	888 d888b 888 888 88888b.  888         8888b.  88888b.d88b.   .d88b.  888     888 88888b.  888888 888 88888b.d88b.  888 88888888  .d88b.  888d888 
+	#	888d88888b888 888 888 "88b 888  88888     "88b 888 "888 "88b d8P  Y8b 888     888 888 "88b 888    888 888 "888 "88b 888    d88P  d8P  Y8b 888P"   
+	# 	88888P Y88888 888 888  888 888    888 .d888888 888  888  888 88888888 888     888 888  888 888    888 888  888  888 888   d88P   88888888 888     
+	# 	8888P   Y8888 888 888  888 Y88b  d88P 888  888 888  888  888 Y8b.     Y88b. .d88P 888 d88P Y88b.  888 888  888  888 888  d88P    Y8b.     888     
+	# 	888P     Y888 888 888  888  "Y8888P88 "Y888888 888  888  888  "Y8888   "Y88888P"  88888P"   "Y888 888 888  888  888 888 88888888  "Y8888  888     
+	#  	  	                                                                              888                                                             
+	#       		                                                                      888                                                             
+	#               		                                                              888                                                             
+	
+	#>
+		Clear-Host
+		write-output ""
+		write-output ""
+		write-output ""
+		write-output ""
+		write-output ""
+		write-output ""
+		write-output ""
+		write-output "  _    _ _       _____                       _____       _   _           _              "
+		write-output " | |  | (_)     |  __ \                     |  _  |     | | (_)         (_)             "
+		write-output " | |  | |_ _ __ | |  \/ __ _ _ __ ___   ___ | | | |_ __ | |_ _ _ __ ___  _ _______ _ __ "
+		write-output " | |/\| | | '_ \| | __ / _  | '_   _ \ / _ \| | | | '_ \| __| | '_   _ \| |_  / _ \ '__|"
+		write-output " \  /\  / | | | | |_\ \ (_| | | | | | |  __/\ \_/ / |_) | |_| | | | | | | |/ /  __/ |   "
+		write-output "  \/  \/|_|_| |_|\____/\__,_|_| |_| |_|\___| \___/| .__/ \__|_|_| |_| |_|_/___\___|_|   "
+		write-output "                                                  | |                                   "
+		write-output "                                                  |_|                                   "
+		write-output ""
+		
 		$scriptDir = Get-CurrentLocation
 		$logFile = "$($scriptDir)$($LogName)"
 			
-		$Host.UI.RawUI.WindowTitle ="Win10 Gamer Optimizer"
-		write-host " Operating System : $OsName $OsDisplayVersion"
-
+		$Host.UI.RawUI.WindowTitle ="WinGameOptimizer"
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		
+		write-output " Operating System : $OsName $OsDisplayVersion"
+		
 		$rammodules = New-Object System.Collections.ArrayList
 		$harddrives = New-Object System.Collections.ArrayList
 		$programs = New-Object System.Collections.ArrayList
-	
+		
 		$hardware = New-Object -Type PSObject | Select-Object ProcessCount, ThreadCount, HandleCount, OperatingSystem, CPU, CPUCores, CPUThreads, CPUSpeed, CPUInfo, MemoryDescription, Memory, MemorySpeed, GPU, GPUName, GPUMemory, PCName, UserName, SerialNumber, Manufacturer, MainboadModel, BIOSversion
-
+		
 		# Gather as much Hardware Information as possible!
-
+		
 		$_ComputerInfo = (Get-ComputerInfo)
-
+		
 		Write-Progress -Activity "Gathering More Information" -Status "Searching..."
 		$_SystemInfo = (Get-WmiObject -Class Win32_Processor -ComputerName. -ErrorAction SilentlyContinue| Select-Object -Property [a-z]*)
-
+		
 		$_ProcessesCount = (Get-Process).Count
 		$_ThreadCount = (Get-Process|Select-Object -ExpandProperty Threads).count
 		$_CurrentRunning = (Get-CimInstance -ClassName Win32_Process -ErrorAction SilentlyContinue | Select-Object -Property Handle, CommandLine)
 		$_CurrrentUserName = (Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue| Select-Object UserName)
 		$_StartupPrograms = (Get-CimInstance Win32_StartupCommand -ErrorAction SilentlyContinue| Select-Object Name, command, Location, User)
 		$_Handles = (Get-CimInstance -ClassName Win32_Process -ErrorAction SilentlyContinue| Select-Object -Property Handle, HandleCount)
-
+		
 		$hardware.HandleCount = ($_Handles | Measure-Object 'HandleCount' -Sum).Sum
-
+		
 		$_Memory = (Get-CimInstance win32_physicalmemory)
-
+		
 		if($_Memory -ne $Null) {
 			
 			$_MemorySize = (Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property capacity -Sum).sum
 			
 			$MemoryType = $Null
-
+			
 			foreach ($Dimm in $_Memory) {
 				$MemoryType = $Dimm.SMBIOSMemoryType
-		
+				
 				if($MemoryType -eq 20) {
 					$MemoryType = 'DDR'
 				} elseif($MemoryType -eq 21) {
@@ -756,18 +1453,18 @@
 				}
 				
 				$newDim = $MemoryType
-		
+				
 				if ($Dimm.Manufacturer -ne $Null) {
 					$Manufacturer = $Dimm.Manufacturer
 					$newDim = $newDim + $Manufacturer
 				}
-	
+				
 				$Capacity = Format-Size -Int -Number $Dimm.Capacity
-		
+				
 				$newDim = $MemoryType +" " + $Capacity
-		
+				
 				$rammodules += $newDim
-		
+				
 			}
 			
 			if($MemoryType -ne $Null) {
@@ -779,7 +1476,7 @@
 		[DateTime]$LastBoot = (Get-CimInstance CIM_OperatingSystem -ErrorAction SilentlyContinue).LastBootUpTime
 		[DateTime]$Now = (Get-Date)
 		$_Uptime = ($Now - $LastBoot)
-	
+		
 		
 		# Detetct Make, Model and Information of hardware / mainboard 
 		
@@ -806,9 +1503,9 @@
 		$_Network = (Get-WmiObject -Query "SELECT * FROM Win32_NetworkAdapterConfiguration" -ErrorAction SilentlyContinue)
 		$_Defender = (Get-WmiObject -Namespace ROOT\Microsoft\Windows\Defender -Class MSFT_MpComputerStatus -ErrorAction SilentlyContinue)
 		$_Smart = (Get-WmiObject -Namespace root\wmi -class MSStorageDriver_FailurePredictStatus -ErrorAction SilentlyContinue)
-
+		
 		#Check if WMI drivers have been installed in the Operating system to interface with the Mainboard
-
+		
 		$Get_manufacturer = (Get-WmiObject Win32_Computersystem).manufacturer
 		If($Get_manufacturer -like "*dell*")
 		{
@@ -844,7 +1541,7 @@
 				$_MSI = (Get-CimClass -namespace root/WMI -ErrorAction SilentlyContinue | Where-Object CimClassName -Match ".*MSI_.*")
 				
 				<#    NameSpace: ROOT/WMI
-
+				
 				# CimClassName                        CimClassMethods      CimClassProperties
 				# ------------                        ---------------      ------------------
 				# Msi_Ap_Service                      {}                   {}
@@ -925,7 +1622,7 @@
 			$hardware.GPUName = $N
 		}
 		
-		Write-Progress -Activity "Completed" -Completed
+		Write-Progress -Complete '(unused)'
 		
 		$IsVirtual=((Get-WmiObject win32_computersystem).model -eq 'VMware Virtual Platform' -or ((Get-WmiObject win32_computersystem).model -eq 'Virtual Machine'))
 		
@@ -950,15 +1647,15 @@
 		$_MemCapacity = Format-Size -Int -Number $_MemorySize
 						
 		if($IsVirtual -eq $true) {
-			write-host " Virtual Machine  : YES"
+			write-output " Virtual Machine  : YES"
 		}
 		
-		write-host " Mainboard        : $($hardware.manufacturer)"
-		write-host " CPU              : $($hardware.CPUInfo)"
-		write-host " Memory           : $($_MemCapacity)"
-		write-host " GPU              : $($hardware.GPU)"
-		write-host "                  : Currently there are $($hardware.HandleCount) Running Processes."
-		write-host ""
+		write-output " Mainboard        : $($hardware.manufacturer)"
+		write-output " CPU              : $($hardware.CPUInfo)"
+		write-output " Memory           : $($_MemCapacity)"
+		write-output " GPU              : $($hardware.GPU)"
+		write-output "                  : Currently there are $($hardware.HandleCount) Running Processes."
+		write-output ""
 
 		if (Test-Path -Path "$($logFile)") {
 			try {
@@ -972,13 +1669,13 @@
 		
 		#$undo = ''
 		#if($PreviousResults.count -gt 0) {
-		#	Write-Host " File $($LogFile) Exists!"
+		#	write-output " File $($LogFile) Exists!"
 		#	$undo = Read-Host -Prompt " Would you like to Undo the last process (Y/N)? "
 		#}
 		
 		if($isXboxRunning -eq $true) {
-			write-host " The Xbox Auth service is running, so I won't touch any Xbox settings."
-			write-host ""
+			write-output " The Xbox Auth service is running, so I won't touch any Xbox settings."
+			write-output ""
 		}
 		
 		if(GET-PrintSpooler -eq $true) {
@@ -986,923 +1683,215 @@
 			write-host " The Print Spooler Service will be Disabled." -ForegroundColor White 
 		}
 		
-		$services = @(
-			"diagnosticshub.standardcollector.service" # Microsoft (R) Diagnostics Hub Standard Collector Service
-			"DiagTrack"                                # Diagnostics Tracking Service
-			"dmwappushservice"                         # WAP Push Message Routing Service (see known issues)
-			"lfsvc"                                    # Geolocation Service
-			"MapsBroker"                               # Downloaded Maps Manager
-			"NetTcpPortSharing"                        # Net.Tcp Port Sharing Service
-			"RemoteAccess"                             # Routing and Remote Access
-			"RemoteRegistry"                           # Remote Registry
-			"SharedAccess"                             # Internet Connection Sharing (ICS)
-			"TrkWks"                                   # Distributed Link Tracking Client
-			"WbioSrvc"                                 # Windows Biometric Service (required for Fingerprint reader / facial detection)
-			"ALG"						               # Application Layer Gateway Service
-			"WMPNetworkSvc"                            # Windows Media Player Network Sharing Service
-			"AJRouter"								   # Enables you to connect to Lot Devices, Smart Lights, Smart TV's
-			"AssignedAccessManager"					   # Helps Settingup Kiosk mode 
-			"DPS"									   # Diagnostic Policy Service   - Waiting for Service to Stop 
-			"WdiServiceHost"						   # Diagnostic Service Host
-			"WdiSystemHost"							   # Diagnostic Service System
-			"PrintNotify"							   # Print Notify Service
-			"TermService"							   # Remote Desktop Services
-			"UmRdpService"							   # Remote Desktop Services UserMode Port Redirector
-			"SessionEnv"							   # Remote Desktop Configuration
-			"SensrSvc"								   # Sensor Monitoring Service
-			"SensorService"						       # Sensor Service
-			"SCardSvr"						           # Smart Card
-			"ScDeviceEnum"							   # Smart Card Device Enumeration Service
-			"SCPolicySvc"							   # Smart Card Removal Policy
-			"WerSvc"								   # Windows Error Reporting Service
-			"workfolderssvc"						   # Windows Work Folders
-			"PcaSvc"								   # Program compatability Monitor    - Waiting for Service to Stop
-			"wisvc"									   # Windows Insider Service
-			"WSearch"								   # Windows Search
-			
-			"WpcMonSvc"								   # Windows Parental Controls
-			#"wscsvc"                                  # Windows Security Center Service
-			#"WSearch"                                 # Windows Search
-			#"ndu"                                     # Windows Network Data Usage Monitor - OS = Waits to Stop 
-			#"WlanSvc"                                 # WLAN AutoConfig (Disabling this can cause issues with wifi connectivity)
-			# Services which cannot be disabled
-			#"WdNisSvc"
-			
-		)
+		CheckServices
+		CheckApps
+		CheckTasks
 		
-		if ($isXboxRunning -eq $false) {
-			$services += @("XblAuthManager", "XblGameSave", "XboxNetApiSvc", "XboxGipSvc")
-		}
-		if ($isDomain -eq $false) {
-			$services += @("NetLogon")
-		}
-		if($isWindows11 -eq $true) {
-			$services += @("TabletInputService")				   # Touch Keyboard and Handwriting Panel Service (ONLY WIn 11)
-		}
-		
-		$c = $services.count
-		$numServices = 0
-		$i = 0
-		Write-Progress "Searching $c Services." 
-		Start-Sleep -Milliseconds $Sleep_Milliseconds
-		foreach ($service in $services) {
-			$i++
-			$p = ($i / $services.count) * 100
-			Write-Progress "Searching $c Services." -Status "$([int]$p)% Complete." -percentComplete $p
-			Start-Sleep -Milliseconds $Sleep_Milliseconds
+		if($script:opt -eq 0) {
 			
-			try {
-				$foundservice = (Get-Service -Name $service -ErrorAction SilentlyContinue| select -Property name, status, starttype)
-				if($foundservice) {
-					if($foundservice.StartType -ne 'Disabled') {
-						$numServices ++
-						$script:FoundServices += $service
-					}
-				}
-			} catch {}
-		}
-		Write-Progress -Activity "Completed" -Completed
-		Start-Sleep -Milliseconds $Sleep_Milliseconds
-		
-		if($numServices -gt 0) {
-			write-opt
-			write-host " $numServices Services will be Disabled." -ForegroundColor White 
-		}
-
-		$tasks = @(
-			# Windows base scheduled tasks
-			"\MicrosoftEdgeUpdateTaskMachineCore"
-			"\MicrosoftEdgeUpdateTaskMachineUA"
-			"\Microsoft\VisualStudio\Updates\BackgroundDownload"
-			"\Microsoft\Windows\.NET Framework\.NET Framework NGEN v4.0.30319"
-			"\Microsoft\Windows\.NET Framework\.NET Framework NGEN v4.0.30319 64"
-			"\Microsoft\Windows\.NET Framework\.NET Framework NGEN v4.0.30319 64 Critical"
-			"\Microsoft\Windows\.NET Framework\.NET Framework NGEN v4.0.30319 Critical"
-			"\Microsoft\Windows\AppID\SmartScreenSpecific"
-			"\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser"
-			"\Microsoft\Windows\Application Experience\PcaPatchDbTask"
-			"\Microsoft\Windows\Application Experience\ProgramDataUpdater"
-			"\Microsoft\Windows\Application Experience\StartupAppTask"
-			"\Microsoft\Windows\Autochk\Proxy"
-			"\Microsoft\Windows\CloudExperienceHost\CreateObjectTask"
-			"\Microsoft\Windows\Customer Experience Improvement Program\Consolidator"
-			"\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask"
-			"\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip"
-			"\Microsoft\Windows\Defrag\ScheduledDefrag"
-			"\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector"
-			"\Microsoft\Windows\Feedback\Siuf\DmClient"
-			"\Microsoft\Windows\Mobile Broadband Accounts\MNO Metadata Parser"
-			#"\Microsoft\Windows\Windows Defender\Windows Defender Cache Maintenance"
-			#"\Microsoft\Windows\Windows Defender\Windows Defender Cleanup"
-			#"\Microsoft\Windows\Windows Defender\Windows Defender Scheduled Scan"
-			#"\Microsoft\Windows\Windows Defender\Windows Defender Verification"
-			"\Microsoft\Windows\Windows Error Reporting\QueueReporting"
-		)
-		
-		$c = $tasks.count
-		$numTasks = 0
-		$i =0
-		Write-Progress "Searching $c Tasks." 
-		Start-Sleep -Milliseconds $Sleep_Milliseconds
-		foreach ($task in $tasks) {
-			$parts = $task.split('\')
-			$name = $parts[-1]
-			$path = $parts[0..($parts.length-2)] -join '\'
-			$path += "\"
-			$i++
-			$p = ($i / $tasks.count) * 100
-			Write-Progress "Searching $c Tasks." -Status "$([int]$p)% Complete." -percentComplete $p
-			Start-Sleep -Milliseconds $Sleep_Milliseconds
+			write-output " No Changes can be made."
 			
-			try {
-				$aTask = (Get-ScheduledTask -TaskName "$($name)" -TaskPath "$($path)" -ErrorAction SilentlyContinue)
-			} catch {}
-			if($aTask) {
-				if($aTask.State -ne 'Disabled') { 
-					$numTasks ++	
-					$script:FoundTasks += $task
-				}
-			}
-		}
-		Write-Progress -Activity "Completed" -Completed
-		Start-Sleep -Milliseconds $Sleep_Milliseconds
-		
-		if($numTasks -gt 0) {
-			write-opt
-			write-host " $numTasks Scheduled Tasks will be Disabled." -ForegroundColor White 
-		}
-		
-		$numApps = 0
-		$apps = @(
-			"Microsoft.549981C3F5F10" #Cortana
-			"Microsoft.3DBuilder"
-			"Microsoft.Appconnector"
-			"Microsoft.BingFinance"
-			"Microsoft.BingNews"
-			"Microsoft.BingSports"
-			"Microsoft.BingTranslator"
-			"Microsoft.BingWeather"
-			
-			"Microsoft.FreshPaint"
-			"Microsoft.GetHelp"
-			"Microsoft.MicrosoftOfficeHub"
-			"Microsoft.MicrosoftPowerBIForWindows"
-			"Microsoft.MicrosoftSolitaireCollection"
-			"Microsoft.MicrosoftStickyNotes"
-			"Microsoft.NetworkSpeedTest"
-			"Microsoft.Office.OneNote"
-			"Microsoft.People"
-			"Microsoft.Print3D"
-			"Microsoft.SkypeApp"
-			"Microsoft.ScreenSketch"
-			
-			"Microsoft.WindowsAlarms"
-			"microsoft.windowscommunicationsapps"
-			"Microsoft.WindowsMaps"
-			
-			"Microsoft.WindowsSoundRecorder"
-			
-			"Microsoft.YourPhone"
-			"Microsoft.ZuneMusic"
-			"Microsoft.ZuneVideo"
-			"Microsoft.Wallet"
-
-			"Microsoft.CommsPhone"
-			"Microsoft.ConnectivityStore"
-			"Microsoft.Getstarted"
-			"Microsoft.Messaging"
-			"Microsoft.Office.Sway"
-			"Microsoft.OneConnect"
-			"Microsoft.WindowsFeedbackHub"
-
-			"Microsoft.BingFoodAndDrink"
-			"Microsoft.BingHealthAndFitness"
-			"Microsoft.BingTravel"
-			"Microsoft.WindowsReadingList"
-			"Microsoft.MicrosoftSolitaireCollection"
-			
-			"1FC1A6C2-576E-489A-9B4A-92D21F542136"         #UpdateHealth Tool
-			
-			"2FE3CB00.PicsArt-PhotoStudio"
-			"46928bounde.EclipseManager"
-			"613EBCEA.PolarrPhotoEditorAcademicEdition"
-			"6Wunderkinder.Wunderlist"
-			"7EE7776C.LinkedInforWindows"
-			"89006A2E.AutodeskSketchBook"
-			"A278AB0D.DisneyMagicKingdoms"
-			"A278AB0D.MarchofEmpires"
-			"ActiproSoftwareLLC.562882FEEB491" # next one is for the Code Writer from Actipro Software LLC
-			"CAF9E577.Plex"  
-			"ClearChannelRadioDigital.iHeartRadio"
-			"D52A8D61.FarmVille2CountryEscape"
-			"D5EA27B7.Duolingo-LearnLanguagesforFree"
-			"DB6EA5DB.CyberLinkMediaSuiteEssentials"
-			"DolbyLaboratories.DolbyAccess"
-			"DolbyLaboratories.DolbyAccess"
-			"Drawboard.DrawboardPDF"
-			"Fitbit.FitbitCoach"
-			"Flipboard.Flipboard"
-			"KeeperSecurityInc.Keeper"
-			"NORDCURRENT.COOKINGFEVER"
-			"PandoraMediaInc.29680B314EFC2"
-			"Playtika.CaesarsSlotsFreeCasino"
-			"ShazamEntertainmentLtd.Shazam"
-			"SlingTVLLC.SlingTV"
-			"ThumbmunkeysLtd.PhototasticCollage"
-			"TuneIn.TuneInRadio"
-			"XINGAG.XING"
-			"flaregamesGmbH.RoyalRevolt2"
-			"king.com.*"
-			"king.com.BubbleWitch3Saga"
-			"king.com.CandyCrushSaga"
-			"king.com.CandyCrushSodaSaga"
-			"A025C540.Yandex.Music"
-			"*ACG*"    					# ACG Media Player
-			"*CandyCrush*"    			# Candy Crush
-			"*Facebook*" 				# Facebook
-			"*Plex*"					# Plex server
-			"Spotify*"					# Spotify
-			"*Twitter*"					# Twitter
-			"*Viber*"					# Viber
-			"*3d*"						# View 3D
-			"SpotifyAB.SpotifyMusic"
-			"SpotifyMusic"
-			
-			"Microsoft.Todos"
-			"Clipchamp.Clipchamp"
-			"Microsoft.ScreenSketch"
-			"Microsoft.WindowsTerminal"
-			"Microsoft.PowerAutomateDesktop"
-			"Microsoft.MixedReality.Portal"
-			"Microsoft.MSPaint"
-			"Microsoft.WindowsCalculator"
-			
-					
-			"MicrosoftWindows.Client.WebExperience"
-			
-			# Microsoft Teams
-			"MicrosoftTeams"
-			
-			# Microsoft Edge
-			"Microsoft.MicrosoftEdge.Stable"
-			"Microsoft.MicrosoftEdge"
-			
-			
-			# Apps which cannot be removed using Remove-AppxPackage
-			#"Microsoft.BioEnrollment"
-			#"Microsoft.Windows.Cortana"
-			#"Microsoft.WindowsFeedback"
-			#"Windows.ContactSupport"
-			#"Microsoft.Windows.CloudExperienceHost"
-			#"Microsoft.Windows.StartMenuExperienceHost"
-			#"Microsoft.Windows.NarratorQuickStart"
-			#"Microsoft.Windows.ParentalControls"
-			#"MicrosoftWindows.UndockedDevKit"
-			#"Windows.CBSPreview"
-			#"Microsoft.Windows.CapturePicker"
-			#"Microsoft.MicrosoftEdgeDevToolsClient"
-			#"Microsoft.Windows.Search"
-			
-			# Apps which other apps depend on
-			#"Microsoft.Advertising.Xaml"
-			
-		)
-		
-		
-			#Win 10 Apps 
-			#Microsoft.AAD.BrokerPlugin                 
-			#Microsoft.Windows.OOBENetworkConnectionFlow
-			#Microsoft.Windows.OOBENetworkCaptivePortal 
-			#MicrosoftWindows.Client.CBS                
-			
-			#Microsoft.Windows.ShellExperienceHost      
-			#windows.immersivecontrolpanel              
-			
-			#Microsoft.Windows.ContentDeliveryManager   
-			#Microsoft.UI.Xaml.2.0                      
-			#Microsoft.Windows.Photos                   
-			
-			#Microsoft.WindowsStore                     
-			#Microsoft.Windows.CallingShellApp          
-			#Microsoft.Windows.XGpuEjectDialog          
-			#Windows.PrintDialog                        
-			
-			#NcsiUwpApp                                 
-			#Microsoft.Windows.SecureAssessmentBrowser  
-			#Microsoft.Win32WebViewHost                 
-			#Microsoft.Windows.Apprep.ChxApp            
-			#Microsoft.Windows.CapturePicker            
-			#Microsoft.Windows.PinningConfirmationDialog
-			#Microsoft.Windows.SecHealthUI              
-			#      
-			#Microsoft.Windows.PeopleExperienceHost     
-
-			#Microsoft.Windows.AssignedAccessLockApp    
-			#1527c705-839a-4832-9118-54d4Bd6a0c89       
-			#Microsoft.LockApp                          
-			#c5e2524a-ea46-4f67-841f-6a9465d9d515       
-			#E2A4F912-2574-4A75-9BB0-0D023378592B       
-			#F46D4000-FD22-4DB4-AC8E-4E1DDDE828FE       
-			#Microsoft.AccountsControl                  
-			#Microsoft.AsyncTextService                 
-			#Microsoft.ECApp                            
-			#Microsoft.CredDialogHost                   
-			
-			#Microsoft.Xbox.TCUI                        
-			#Microsoft.XboxGameOverlay  
-			#Microsoft.XboxSpeechToTextOverlay     
-			
-			#Microsoft.WebMediaExtensions               
-			
-			#Microsoft.ScreenSketch                     
-			#Microsoft.People                           
-			#Microsoft.Office.OneNote                   
-			#Microsoft.MicrosoftOfficeHub               
-			#Microsoft.MicrosoftEdge.Stable             
-			#Microsoft.Microsoft3DViewer                
-			#Microsoft.WindowsAppRuntime.1.2            
-			#Microsoft.WindowsAppRuntime.1.2            
-			#Microsoft.VCLibs.140.00                    
-			#Microsoft.VCLibs.140.00                    
-			
-			#Microsoft.BingWeather                      
-			#Microsoft.HEIFImageExtension               
-			#Microsoft.UI.Xaml.2.7                      
-			#Microsoft.WindowsMaps                      
-     
-			
-			#Microsoft.MicrosoftStickyNotes             
-			#Microsoft.WindowsSoundRecorder             
-			#Microsoft.WindowsCamera                    
-			#Microsoft.WebpImageExtension               
-			#Microsoft.MicrosoftSolitaireCollection     
-			#microsoft.windowscommunicationsapps        
-			
-			#Microsoft.SkypeApp                         
-			
-			#Microsoft.DesktopAppInstaller              
-			
-			#Microsoft.StorePurchaseApp                 
-			#Microsoft.YourPhone                        
-			#Microsoft.549981C3F5F10                    
-			#Microsoft.VP9VideoExtensions               
-
-			#Win 11 Apps
-			
-			#Microsoft.Windows.OOBENetworkConnectionFlow
-			#Microsoft.Windows.OOBENetworkCaptivePortal 
-			#MicrosoftWindows.UndockedDevKit            
-			#Microsoft.UI.Xaml.CBS                      
-			#MicrosoftWindows.Client.Core               
-			#Microsoft.WindowsAppRuntime.CBS            
-			#MicrosoftWindows.Client.FileExp            
-			#Microsoft.Windows.CloudExperienceHost      
-			#Microsoft.BioEnrollment                    
-			#MicrosoftWindows.Client.CBS                
-			#Microsoft.AAD.BrokerPlugin                 
-			#Microsoft.Windows.ShellExperienceHost      
-			#windows.immersivecontrolpanel              
-			#Microsoft.NET.Native.Framework.2.2         
-			#Microsoft.NET.Native.Runtime.2.2           
-			#Microsoft.Windows.ContentDeliveryManager   
-			#Microsoft.VCLibs.140.00                    
-			
-			#Microsoft.MicrosoftEdge.Stable             
-			#Microsoft.LanguageExperiencePacken-GB      
-			#Microsoft.Windows.Apprep.ChxApp            
-			#Microsoft.NET.Native.Runtime.2.2           
-			#Microsoft.NET.Native.Framework.2.2         
-			#Microsoft.UI.Xaml.2.8                      
-			#Microsoft.VCLibs.140.00.UWPDesktop         
-			#Microsoft.VCLibs.140.00                    
-			#Microsoft.Windows.PinningConfirmationDialog
-			#Microsoft.Paint                            
-			#Microsoft.Windows.PeopleExperienceHost     
-			#Microsoft.Windows.PrintQueueActionCenter   
-			#Microsoft.WindowsStore                     
-			#Microsoft.Windows.AssignedAccessLockApp    
-			#Microsoft.MicrosoftEdgeDevToolsClient      
-			#Microsoft.ZuneMusic                        
-			#Microsoft.UI.Xaml.2.7                      
-			#Microsoft.UI.Xaml.2.7                      
-			#Microsoft.Windows.SecureAssessmentBrowser  
-			#Microsoft.ZuneVideo                        
-			#Microsoft.Win32WebViewHost                 
-			
-			#Microsoft.Windows.CapturePicker            
-			#Microsoft.Windows.ParentalControls         
-			#Microsoft.Windows.XGpuEjectDialog          
-			#Microsoft.Windows.CallingShellApp          
-			#Microsoft.Windows.NarratorQuickStart       
-			#Windows.PrintDialog                        
-			#1527c705-839a-4832-9118-54d4Bd6a0c89       
-			#NcsiUwpApp                                 
-			#c5e2524a-ea46-4f67-841f-6a9465d9d515       
-			#Microsoft.LockApp                          
-			#Microsoft.ECApp                            
-			#Microsoft.CredDialogHost                   
-			#Microsoft.AsyncTextService                 
-			#Microsoft.AccountsControl                  
-			#F46D4000-FD22-4DB4-AC8E-4E1DDDE828FE       
-			#E2A4F912-2574-4A75-9BB0-0D023378592B       
-			#microsoft.windowscommunicationsapps        
-			#Microsoft.Windows.Photos                   
-			#Microsoft.UI.Xaml.2.4                      
-			#Microsoft.Windows.DevHome                  
-			#Microsoft.SecHealthUI                      
-			#Microsoft.BingWeather                      
-                
-			#Microsoft.HEVCVideoExtension               
-			#Microsoft.HEIFImageExtension               
-			#Microsoft.WindowsMaps                      
-			#Microsoft.People                           
-        
-			#Microsoft.549981C3F5F10                    
-			#Microsoft.MicrosoftOfficeHub               
-			#Microsoft.WindowsSoundRecorder             
-			#Microsoft.Services.Store.Engagement        
-
-			#Microsoft.WindowsCamera                    
-
-			#Microsoft.RawImageExtension                
-			
-			#Microsoft.WebpImageExtension               
-
-			#MicrosoftCorporationII.QuickAssist         
-			
-			#Microsoft.WindowsFeedbackHub               
-			#Microsoft.WindowsCalculator                
-
-			#Microsoft.DesktopAppInstaller              
-			#Microsoft.WindowsAppRuntime.1.4            
-			#Microsoft.YourPhone                        
-			#Microsoft.VP9VideoExtensions               
-			#Microsoft.WindowsNotepad                   
-           
-			#Microsoft.Getstarted                       
-			#Microsoft.WebMediaExtensions               
-			#Microsoft.MicrosoftStickyNotes             
-			#Microsoft.StorePurchaseApp 
-			
-
-		if ($isXboxRunning -eq $false) {
-			# "Microsoft.XboxGameCallableUI"
-			$apps += @("Microsoft.XboxApp", "Microsoft.GamingApp", "Microsoft.XboxIdentityProvider", "Microsoft.XboxGameOverlay", "Microsoft.Xbox.TCUI", "Microsoft.XboxSpeechToTextOverlay","Microsoft.XboxGamingOverlay")
-		}
-		
-		$c = $apps.count
-		Write-Progress "Searching $c Microsoft Store Apps." 
-		Start-Sleep -Milliseconds $Sleep_Milliseconds
-		$numApps = 0
-		$i = 0
-
-		foreach  ($app in $apps) {
-			$i ++
-			$p = ($i / $apps.count) * 100
-			
-			$getApp = $null
-			Write-Progress "Searching $c Microsoft Store Apps." -percentComplete $p
-			Start-Sleep -Milliseconds $Sleep_Milliseconds
-			
-			try {
-				$getApp = (Get-AppxPackage -AllUsers | Where-Object {  $_.Name -like "$($app)" } )
-			} catch {}
-			
-			if($getApp -ne $null) {
-					$FullName = $getApp.PackageFullName
-					$FamilyName = $getApp.PackageFamilyName
-					#$FullName = $getApp.Name
-					$numApps ++
-					if($FullName) {
-						if($script:FoundAllUsersApps -NotContains $Fullname ) {
-							$script:FoundAllUsersApps += $FullName
-						}
-					}
-					if ($script:FoundFamilyNames -NotContains $FamilyName) {
-						$script:FoundFamilyNames  += $FamilyName
-					}
-			} else {
-			
-				$getApp = $null
-				try {
-					$getApp = (Get-AppxPackage | Where-Object {  $_.Name -like "$($app)" })
-				} catch {}
-			
-				if($getApp -ne $null) {
-					$FullName = $getApp.PackageFullName
-					$FamilyName = $getApp.PackageFamilyName
-					#$FullName = $getApp.Name
-					$numApps ++
-					if($FullName) {
-						if($script:FoundApps -NotContains $Fullname ) {
-							$script:FoundApps += $FullName
-						}
-					}
-					if ($script:FoundFamilyNames -NotContains $FamilyName) {
-						$script:FoundFamilyNames  += $FamilyName
-					}
-				}
-				
-			}
-			
-			$getApp = $null
-			try { 
-				$getApp = (Get-AppxProvisionedPackage -online | where-object {$_.displayname -like "$($app)"})
-			} catch {}
-			
-			if($getApp -ne $null) {
-					$FullName = $getApp.PackageName
-					$numApps ++
-					if($FullName) {
-						if($script:FoundPrApps -NotContains $Fullname ) {
-							$script:FoundPrApps += $FullName
-						}
-					}
-			}
-		}
-		
-		Write-Progress -Activity "Completed" -Completed
-		Start-Sleep -Milliseconds $Sleep_Milliseconds
-		
-		
-		if($numApps -gt 0) {
-			$opt++
-			write-opt $opt
-			write-host " $numApps Microsoft Store Apps will be Removed." -ForegroundColor White 
-		}
-		if($opt -eq 0) {
-		
 		} else {
-		if($osEdition -eq 'Pro' -or  $osEdition -eq 'Home') {
-			Write-Host ""
-			$createcheckpoint = Read-Host -Prompt " Would you like create a Windows System Restore (Y/N)?"
-		}
-		
-		
-		Write-Host ""
-		Write-Host 	   " PLEASE ONLY RUN THIS SCRIPT IF THIS COMPUTER IS USED FOR GAMING ONLY"
-		Write-Host ""
-		$runok = Read-Host -Prompt " Would you like make these changes to your PC (Y/N)? "
-		
-		if($runok -eq 'Y' -OR $runok -eq 'y') {
-			
-			write-host " Running..." -ForegroundColor Green
-			
-			if($createcheckpoint -eq 'Y' -OR $createcheckpoint -eq 'y') {
-				Write-Progress -Activity "Creating System Restore." -Status "..."
-				Start-Sleep -Milliseconds $Sleep_Milliseconds
-				$laststatus = (Get-ComputerRestorePoint -LastStatus)
-				
-				try {
-					Enable-ComputerRestore -Drive "C:\" -Confirm:$False -ErrorAction SilentlyContinue | Out-Null
-					Start-Sleep -Milliseconds $Sleep_Milliseconds
-				} catch {}
-				
-								
-				Checkpoint-Computer -Description "WinGameOptimizer" -RestorePointType "MODIFY_SETTINGS"
-				Start-Sleep -Milliseconds $Sleep_Milliseconds
-				
-				Write-Progress -Activity "Completed" -Completed
-				Start-Sleep -Milliseconds $Sleep_Milliseconds
-				
+			if($osEdition -eq 'Pro' -or  $osEdition -eq 'Home') {
+				write-output ""
+				[console]::CursorVisible = $true
+				$createcheckpoint = Read-Host -Prompt " Would you like create a Windows System Restore (Y/N)?"
 			}
+
+			write-output ""
+			write-output 	   " PLEASE ONLY RUN THIS SCRIPT IF THIS COMPUTER IS USED FOR GAMING ONLY"
+			write-output ""
+			$runok = Read-Host -Prompt " Would you like make these changes to your PC (Y/N)? "
+		
+			if($runok -eq 'Y' -OR $runok -eq 'y') {
 			
-			Remove-PinnedApps
-			$SpoolerDisabled = Disable-PrintSpooler
-			Trim-HardDrives
-			$SavedSpace = Clean-WindowsUpdate
+				write-host " Running..." -ForegroundColor Green
+				[console]::CursorVisible =$False
+				
+				if($createcheckpoint -eq 'Y' -OR $createcheckpoint -eq 'y') {
+					CreateSystemRestore-Point
+				}
 			
-			$numTasks = 0
-			$i =0
-			Write-Progress "Removing Tasks" 
-			Start-Sleep -Milliseconds $Sleep_Milliseconds
-			foreach ($task in $script:FoundTasks) {
-				$aTask = $null
-				$parts = $task.split('\')
-				$name = $parts[-1]
-				$path = $parts[0..($parts.length-2)] -join '\'
-				$path += "\"
-				$i++
-				$p = ($i / $script:FoundTasks.count) * 100
-				Write-Progress "Removing Tasks" -Status "$([int]$p)% Complete." -percentComplete $p
-				try {
-					$aTask = (Get-ScheduledTask -TaskName "$($name)" -TaskPath "$($path)" -ErrorAction SilentlyContinue)
-				} catch {}
-				if($aTask -ne $null) {
-					try {
-						Disable-ScheduledTask -TaskName "$($name)" -TaskPath "$($path)" -ErrorAction SilentlyContinue
-					} catch {
-						Write-host -f red "Error: "$_.Exception.Message
+
+				Remove-PinnedApps
+				$SpoolerDisabled = Disable-PrintSpooler
+							
+				Remove-Services
+				Remove-Apps 
+			
+				Remove-Tasks			
+				Turnoff-Telementary
+				Remove-Spotify
+			    DisableCortana
+				Remove-App-RegistryEntries
+				
+				# Do these steps last
+				Trim-HardDrives
+				$SavedSpace = Clean-WindowsUpdate
+				
+				#Finished
+				#$StartMenuItems = (New-Object -Com Shell.Application).NameSpace('shell:::{4234d49b-0245-4df3-b780-3893943456e1}').Items()
+				
+				$NewHandles = (Get-CimInstance -ClassName Win32_Process -ErrorAction SilentlyContinue| Select-Object -Property Handle, HandleCount)
+				$newHandleCount = ($NewHandles | Measure-Object 'HandleCount' -Sum).Sum
+				$handleDiff = $hardware.HandleCount - $newHandleCount
+			
+				write-output ""
+				write-output " Removed $($script:FoundApps.count) Apps, $($script:FoundTasks.count) Tasks $($script:FoundServices.Count) Services"
+				write-output " Processes dropped by $handleDiff Handles"
+			
+				<#
+				
+				# Sends a request to delete all uploaded diagnostic data sent to Microsoft from the current device.
+				# Clear-WindowsDiagnosticData -Force
+	
+				# WIN 11 Disable-MMAgent–MemoryCompression
+				Disable-MMAgent
+		
+					-ApplicationLaunchPrefetching 
+					-ApplicationPreLaunch
+					-MemoryCompression
+					-PageCombining
+			
+				# Disable-MMAgent -mc
+
+				Write-Output "Disabling Windows Defender Services"
+				Takeown-Registry("HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WinDefend")
+				Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\WinDefend" "Start" 4
+				Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\WinDefend" "AutorunsDisabled" 3
+				Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\WdNisSvc" "Start" 4
+				Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\WdNisSvc" "AutorunsDisabled" 3
+				Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\Sense" "Start" 4
+				Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\Sense" "AutorunsDisabled" 3
+	
+				Write-Output "Removing Windows Defender context menu item"
+				Set-Item "HKLM:\SOFTWARE\Classes\CLSID\{09A47860-11B0-4DA5-AFA5-26D86198A780}\InprocServer32" ""
+	
+				Write-Output "Removing Windows Defender GUI / tray from autorun"
+				Remove-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" "WindowsDefender" -ea 0
+	
+				Write-Output "Set general privacy options"
+				# "Let websites provide locally relevant content by accessing my language list"
+				Set-ItemProperty -Path "HKCU:\Control Panel\International\User Profile" "HttpAcceptLanguageOptOut" 1
+	
+				# Locaton aware printing (changes default based on connected network)
+				New-FolderForced -Path "HKCU:\Printers\Defaults"
+				Set-ItemProperty -Path "HKCU:\Printers\Defaults" "NetID" "{00000000-0000-0000-0000-000000000000}"
+	
+				# "Send Microsoft info about how I write to help us improve typing and writing in the future"
+				New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\Input\TIPC"
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Input\TIPC" "Enabled" 0
+	
+				# "Let apps use my advertising ID for experiencess across apps"
+				New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo"
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo" "Enabled" 0
+	
+				# "Turn on SmartScreen Filter to check web content"
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppHost" "EnableWebContentEvaluation" 0
+	
+				Write-Output "Disable synchronisation of settings"
+				# These only apply if you log on using Microsoft account
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\SettingSync" "BackupPolicy" 0x3c
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\SettingSync" "DeviceMetadataUploaded" 0
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\SettingSync" "PriorLogons" 1
+	
+				$groups = @(
+					"Accessibility"
+					"AppSync"
+					"BrowserSettings"
+					"Credentials"
+					"DesktopTheme"
+					"Language"
+					"PackageState"
+					"Personalization"
+					"StartLayout"
+					"Windows"
+				)
+				foreach ($group in $groups) {
+					New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\SettingSync\Groups\$group"
+					Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\SettingSync\Groups\$group" "Enabled" 0
+				}
+			
+				Write-Output "Set privacy policy accepted state to 0"
+				# Prevents sending speech, inking and typing samples to MS (so Cortana can learn to recognise you)
+				New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\Personalization\Settings"
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Personalization\Settings" "AcceptedPrivacyPolicy" 0
+	
+				Write-Output "Do not scan contact informations"
+				# Prevents sending contacts to MS (so Cortana can compare speech etc samples)
+				New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\InputPersonalization\TrainedDataStore"
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\InputPersonalization\TrainedDataStore" "HarvestContacts" 0
+	
+				Write-Output "Inking and typing settings"
+				# Handwriting recognition personalization
+				New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\InputPersonalization"
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\InputPersonalization" "RestrictImplicitInkCollection" 1
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\InputPersonalization" "RestrictImplicitTextCollection" 1
+		
+				Write-Output "Microsoft Edge settings"
+				New-FolderForced -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\Main"
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\Main" "DoNotTrack" 1
+				New-FolderForced -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\User\Default\SearchScopes"
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\User\Default\SearchScopes" "ShowSearchSuggestionsGlobal" 0
+				New-FolderForced -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\FlipAhead"
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\FlipAhead" "FPEnabled" 0
+				New-FolderForced -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\PhishingFilter"
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\PhishingFilter" "EnabledV9" 0
+	
+				Write-Output "Disable background access of default apps"
+				foreach ($key in (Get-ChildItem "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications")) {
+					Set-ItemProperty -Path ("HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications\" + $key.PSChildName) "Disabled" 1
+				}
+	
+				Write-Output "Denying device access"
+				# Disable sharing information with unpaired devices
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global\LooselyCoupled" "Type" "LooselyCoupled"
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global\LooselyCoupled" "Value" "Deny"
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global\LooselyCoupled" "InitialAppValue" "Unspecified"
+				foreach ($key in (Get-ChildItem "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global")) {
+					if ($key.PSChildName -EQ "LooselyCoupled") {
+						continue
 					}
-					try {
-						(Unregister-ScheduledTask -TaskName "$($name)" -TaskPath "$($path)" -Confirm:$false -ErrorAction SilentlyContinue)
-						Start-Sleep -Milliseconds $Sleep_Milliseconds
-						$numTasks ++
-					} catch {
-						Write-host -f red "Error: "$_.Exception.Message
-					}
+					Set-ItemProperty -Path ("HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global\" + $key.PSChildName) "Type" "InterfaceClass"
+					Set-ItemProperty -Path ("HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global\" + $key.PSChildName) "Value" "Deny"
+					Set-ItemProperty -Path ("HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global\" + $key.PSChildName) "InitialAppValue" "Unspecified"
 				}
-			}
-			Write-Progress -Activity "Completed" -Completed
-			Start-Sleep -Milliseconds $Sleep_Milliseconds
-			
-			$numServices = 0
-			$i = 0
-			Write-Progress "Disabling Services" 
-			Start-Sleep -Milliseconds $Sleep_Milliseconds
-			foreach ($service in $script:FoundServices) {
-				$foundservice = $null
-				$i++
-				$p = ($i / $script:FoundServices.count) * 100
-				Write-Progress "Disabling Services" -Status "$([int]$p)% Complete." -percentComplete $p
-				Start-Sleep -Milliseconds $Sleep_Milliseconds	
-				try {
-					$foundservice = (Get-Service -Name "$($service)" -ErrorAction SilentlyContinue)
-				} catch {}
 				
-				if($foundservice -ne $null) {
-						
-					try {
-						Stop-Service -Name "$($service)" -Force | Out-Null
-						Start-Sleep -Milliseconds $Sleep_Milliseconds
-					} catch {
-						Write-host -f red "Error: "$_.Exception.Message
-					}
-					try {
-						Set-Service -Name "$($service)" -StartupType Disabled | Out-Null
-						Start-Sleep -Milliseconds $Sleep_Milliseconds
-					} catch {
-						Write-host -f red "Error: "$_.Exception.Message
-					}
-					$numServices ++
-				}				
-			}
-			Write-Progress -Activity "Completed" -Completed
-			Start-Sleep -Milliseconds $Sleep_Milliseconds
-		
-			$i = 0
-			foreach  ($app in $script:FoundFamilyNames) {
-				$i ++
-				$p = ($i / $script:FoundFamilyNames.count) * 100
-				Write-Progress "Allowing the Removal Store Apps" -percentComplete $p
-				Start-Sleep -Milliseconds $Sleep_Milliseconds
-				
-				try {
-					$rem= (Set-NonRemovableAppsPolicy -Online -PackageFamilyName "$($app)" -NonRemovable 0 -ErrorAction SilentlyContinue | Out-Null)
-				} catch {
-					Write-host -f red "Error: "$_.Exception.Message
-				}
-			}
+				Write-Output "Disable location sensor"
+				New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Sensor\Permissions\{BFA794E4-F964-4FDB-90F6-51056BFE4B44}"
+				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Sensor\Permissions\{BFA794E4-F964-4FDB-90F6-51056BFE4B44}" "SensorPermissionState" 0
+	
+				Write-Output "Disable submission of Windows Defender findings (w/ elevated privileges)"
+				Takeown-Registry("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Defender\Spynet")
+				Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows Defender\Spynet" "SpyNetReporting" 0       # write-protected even after takeown ?!
+				Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows Defender\Spynet" "SubmitSamplesConsent" 0
+	
+				#Write-Output "Disable automatic download and installation of Windows updates"
+				#New-FolderForced -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\WindowsUpdate\AU"
+				#Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\WindowsUpdate\AU" "NoAutoUpdate" 1
+				#Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\WindowsUpdate\AU" "AUOptions" 2
+				#Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\WindowsUpdate\AU" "ScheduledInstallDay" 0
+				#Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\WindowsUpdate\AU" "ScheduledInstallTime" 3
+	
+				Write-Output "Disable seeding of updates to other computers via Group Policies"
+				New-FolderForced -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization"
+				Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization" "DODownloadMode" 0
+	
+				#echo "Disabling automatic driver update"
+				#sp "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\DriverSearching" "SearchOrderConfig" 0
+	
+				$objSID = New-Object System.Security.Principal.SecurityIdentifier "S-1-1-0"
+				$EveryOne = $objSID.Translate( [System.Security.Principal.NTAccount]).Value
+	
+				# disable prelaunch. lowers ram usage slightly
+				Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\Main" "AllowPrelaunch" 0
+				Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\TabPreloader" "AllowTabPreloading" 0
 			
-			$numApps = 0
-			$i = 0
-			foreach  ($app in $script:FoundApps) {
-				$i ++
-				$p = ($i / $script:FoundApps.count) * 100
-				Write-Progress "Removing Microsoft Store Apps" -percentComplete $p
-				Start-Sleep -Milliseconds $Sleep_Milliseconds
-				
-				try {
-					$rem= (Remove-AppxPackage -Package "$($app)" -ErrorAction SilentlyContinue | Out-Null)
-					$numApps ++
-				} catch {
-					Write-host -f red "Error: "$_.Exception.Message
-				}
-			}
-			
-			$i = 0
-			foreach  ($app in $script:FoundAllUsersApps) {
-				$i ++
-				$p = ($i / $script:FoundAllUsersApps.count) * 100
-				Write-Progress "Removing AllUsers Microsoft Store Apps" -percentComplete $p
-				Start-Sleep -Milliseconds $Sleep_Milliseconds
-				try {
-					$rem= (Remove-AppxPackage -AllUsers -Package "$($app)" -ErrorAction SilentlyContinue | Out-Null)
-					$numApps ++
-				} catch {
-					Write-host -f red "Error: "$_.Exception.Message
-				}
-			}
-			
-			$i = 0
-			foreach  ($app in $script:FoundPrApps) {
-				$i ++
-				$p = ($i / $script:FoundPrApps.count) * 100
-				Write-Progress "Removing Microsoft Online Store Apps" -percentComplete $p
-				Start-Sleep -Milliseconds $Sleep_Milliseconds
-				try {
-					#Remove-AppxProvisionedPackage -online -packagename $app -ErrorAction SilentlyContinue | Out-Null
-					$rem= (Get-AppxProvisionedPackage -Online | Where {$_.PackageName -match "$($app)"} | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Out-Null)
-					$numApps ++
-				} catch {
-					Write-host -f red "Error: "$_.Exception.Message
-				}
-			}
-			
-			Write-Progress -Activity "Completed" -Completed
-			Start-Sleep -Milliseconds $Sleep_Milliseconds
-			
-			Turnoff-Telementary
-			Remove-Spotify
-			
-			$StartMenuItems = (New-Object -Com Shell.Application).NameSpace('shell:::{4234d49b-0245-4df3-b780-3893943456e1}').Items()
-			
-			$NewHandles = (Get-CimInstance -ClassName Win32_Process -ErrorAction SilentlyContinue| Select-Object -Property Handle, HandleCount)
-			$newHandleCount = ($NewHandles | Measure-Object 'HandleCount' -Sum).Sum
-			$handleDiff =- $hardware.HandleCount - $newHandleCount
-			
-			Write-Host ""
-			Write-Host " Removed $numApps Apps, $numTasks Tasks $numServices Services"
-			Write-host " Processes dropped by $handleDiff"
-			
-			<#
-			foreach ($task in $tasks) {
-				$parts = $task.split('\')
-				$name = $parts[-1]
-				$path = $parts[0..($parts.length-2)] -join '\'
-				Write-Output "Disabling Task '$($name)'"
-				try {
-					
-					Disable-ScheduledTask -TaskName "$name" -TaskPath "$path" -ErrorAction SilentlyContinue
-	
-				} catch {}
-			}
-	
-			foreach ($service in $services) {
-				Write-Output "Disabling Service '$($service)'"
-				try {
-					Get-Service -Name $service | Set-Service -StartupType Disabled
-				} catch {}
-			}
-			
-			# Sends a request to delete all uploaded diagnostic data sent to Microsoft from the current device.
-			# Clear-WindowsDiagnosticData -Force
-	
-			# WIN 11 Disable-MMAgent–MemoryCompression
-	
-			Disable-MMAgent
-		
-				-ApplicationLaunchPrefetching 
-				-ApplicationPreLaunch
-				-MemoryCompression
-				-PageCombining
-			
-			# Disable-MMAgent -mc
-	
-		
-			$_SearchSetting = Get-WindowsSearchSetting 
-			
-			
-			# EnableMeteredWebResultsSetting. Whether Windows Search displays web results and suggestions while using a metered network.
-			# EnableWebResultsSetting. Whether Windows Search displays web results and suggestions.
-			# SearchExperienceSetting. The experience setting.
-			#    PersonalizedAndLocation. Personalize Windows Search and other Microsoft experiences by using search history, some Microsoft account information, and specific location of the user.
-			#    Personalized. Personalize Windows Search and other Microsoft experiences by using search history and some Microsoft account information, but do not use specific location of the user.
-			#    NotPersonalized. Do not personalize Windows Search and other Microsoft experiences or use specific location of the user.
-			# WindowsSafeSearchSetting. The value of SafeSearch that Windows Search uses for queries.
-			#    Off. Windows Search does not remove adult content from results.
-			#    Moderate. Windows Search excludes adult images and videos, but not text, from results.
-			#    Strict. Windows Search excludes adult images, videos, and text from results.
-			# Set-WindowsSearchSetting [-EnableWebResultsSetting <Boolean>] [-EnableMeteredWebResultsSetting <Boolean>] [-SearchExperienceSetting <String>] [-SafeSearchSetting <String>]
-			
-			Write-Output "Disabling Windows Defender Services"
-			Takeown-Registry("HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WinDefend")
-			Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\WinDefend" "Start" 4
-			Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\WinDefend" "AutorunsDisabled" 3
-			Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\WdNisSvc" "Start" 4
-			Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\WdNisSvc" "AutorunsDisabled" 3
-			Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\Sense" "Start" 4
-			Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\Sense" "AutorunsDisabled" 3
-	
-			Write-Output "Removing Windows Defender context menu item"
-			Set-Item "HKLM:\SOFTWARE\Classes\CLSID\{09A47860-11B0-4DA5-AFA5-26D86198A780}\InprocServer32" ""
-	
-			Write-Output "Removing Windows Defender GUI / tray from autorun"
-			Remove-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" "WindowsDefender" -ea 0
-	
-			Write-Output "Set general privacy options"
-			# "Let websites provide locally relevant content by accessing my language list"
-			Set-ItemProperty -Path "HKCU:\Control Panel\International\User Profile" "HttpAcceptLanguageOptOut" 1
-	
-			# Locaton aware printing (changes default based on connected network)
-			New-FolderForced -Path "HKCU:\Printers\Defaults"
-			Set-ItemProperty -Path "HKCU:\Printers\Defaults" "NetID" "{00000000-0000-0000-0000-000000000000}"
-	
-			# "Send Microsoft info about how I write to help us improve typing and writing in the future"
-			New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\Input\TIPC"
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Input\TIPC" "Enabled" 0
-	
-			# "Let apps use my advertising ID for experiencess across apps"
-			New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo"
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo" "Enabled" 0
-	
-			# "Turn on SmartScreen Filter to check web content"
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppHost" "EnableWebContentEvaluation" 0
-	
-			Write-Output "Disable synchronisation of settings"
-			# These only apply if you log on using Microsoft account
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\SettingSync" "BackupPolicy" 0x3c
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\SettingSync" "DeviceMetadataUploaded" 0
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\SettingSync" "PriorLogons" 1
-	
-			$groups = @(
-				"Accessibility"
-				"AppSync"
-				"BrowserSettings"
-				"Credentials"
-				"DesktopTheme"
-				"Language"
-				"PackageState"
-				"Personalization"
-				"StartLayout"
-				"Windows"
-			)
-			foreach ($group in $groups) {
-				New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\SettingSync\Groups\$group"
-				Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\SettingSync\Groups\$group" "Enabled" 0
-			}
-			
-			Write-Output "Set privacy policy accepted state to 0"
-			# Prevents sending speech, inking and typing samples to MS (so Cortana can learn to recognise you)
-			New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\Personalization\Settings"
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Personalization\Settings" "AcceptedPrivacyPolicy" 0
-	
-			Write-Output "Do not scan contact informations"
-			# Prevents sending contacts to MS (so Cortana can compare speech etc samples)
-			New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\InputPersonalization\TrainedDataStore"
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\InputPersonalization\TrainedDataStore" "HarvestContacts" 0
-	
-			Write-Output "Inking and typing settings"
-			# Handwriting recognition personalization
-			New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\InputPersonalization"
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\InputPersonalization" "RestrictImplicitInkCollection" 1
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\InputPersonalization" "RestrictImplicitTextCollection" 1
-		
-			Write-Output "Microsoft Edge settings"
-			New-FolderForced -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\Main"
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\Main" "DoNotTrack" 1
-			New-FolderForced -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\User\Default\SearchScopes"
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\User\Default\SearchScopes" "ShowSearchSuggestionsGlobal" 0
-			New-FolderForced -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\FlipAhead"
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\FlipAhead" "FPEnabled" 0
-			New-FolderForced -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\PhishingFilter"
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppContainer\Storage\microsoft.microsoftedge_8wekyb3d8bbwe\MicrosoftEdge\PhishingFilter" "EnabledV9" 0
-	
-			Write-Output "Disable background access of default apps"
-			foreach ($key in (Get-ChildItem "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications")) {
-				Set-ItemProperty -Path ("HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications\" + $key.PSChildName) "Disabled" 1
-			}
-	
-			Write-Output "Denying device access"
-			# Disable sharing information with unpaired devices
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global\LooselyCoupled" "Type" "LooselyCoupled"
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global\LooselyCoupled" "Value" "Deny"
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global\LooselyCoupled" "InitialAppValue" "Unspecified"
-			foreach ($key in (Get-ChildItem "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global")) {
-				if ($key.PSChildName -EQ "LooselyCoupled") {
-					continue
-				}
-				Set-ItemProperty -Path ("HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global\" + $key.PSChildName) "Type" "InterfaceClass"
-				Set-ItemProperty -Path ("HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global\" + $key.PSChildName) "Value" "Deny"
-				Set-ItemProperty -Path ("HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeviceAccess\Global\" + $key.PSChildName) "InitialAppValue" "Unspecified"
-			}
-				
-			Write-Output "Disable location sensor"
-			New-FolderForced -Path "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Sensor\Permissions\{BFA794E4-F964-4FDB-90F6-51056BFE4B44}"
-			Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Sensor\Permissions\{BFA794E4-F964-4FDB-90F6-51056BFE4B44}" "SensorPermissionState" 0
-	
-			Write-Output "Disable submission of Windows Defender findings (w/ elevated privileges)"
-			Takeown-Registry("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Defender\Spynet")
-			Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows Defender\Spynet" "SpyNetReporting" 0       # write-protected even after takeown ?!
-			Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows Defender\Spynet" "SubmitSamplesConsent" 0
-	
-			Write-Output "Disable automatic download and installation of Windows updates"
-			New-FolderForced -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\WindowsUpdate\AU"
-			Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\WindowsUpdate\AU" "NoAutoUpdate" 1
-			Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\WindowsUpdate\AU" "AUOptions" 2
-			Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\WindowsUpdate\AU" "ScheduledInstallDay" 0
-			Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\WindowsUpdate\AU" "ScheduledInstallTime" 3
-	
-			Write-Output "Disable seeding of updates to other computers via Group Policies"
-			New-FolderForced -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization"
-			Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization" "DODownloadMode" 0
-	
-			#echo "Disabling automatic driver update"
-			#sp "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\DriverSearching" "SearchOrderConfig" 0
-	
-			$objSID = New-Object System.Security.Principal.SecurityIdentifier "S-1-1-0"
-			$EveryOne = $objSID.Translate( [System.Security.Principal.NTAccount]).Value
-	
-			# disable prelaunch. lowers ram usage slightly
-			Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\Main" "AllowPrelaunch" 0
-			Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\TabPreloader" "AllowTabPreloading" 0
+				taskkill /F /IM SearchUI.exe
+				move "%windir%\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy" "%windir%\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy.bak"
 	
 			
-			taskkill /F /IM SearchUI.exe
-			move "%windir%\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy" "%windir%\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy.bak"
-	
-			
-			Write-Output "Disable 'Updates are available' message"
+				Write-Output "Disable 'Updates are available' message"
 	
 			takeown /F "$env:WinDIR\System32\MusNotification.exe"
 			icacls "$env:WinDIR\System32\MusNotification.exe" /deny "$($EveryOne):(X)"
@@ -1961,18 +1950,18 @@
 
 		} # runok = Y
 		
-		write-host ""
+		write-output ""
 		#$_SystemInfo
 		pause
 			
 		} else {
-			write-host "ExecutionPolicy: $ExecPolicy"
-			write-host ""
+			write-output "ExecutionPolicy: $ExecPolicy"
+			write-output ""
 			pause
 		}
 	} else {
-		write-host "Please run the script using 'run as Administrator'"
-		write-host ""
+		write-output "Please run the script using 'run as Administrator'"
+		write-output ""
 		pause
 	}
 }
