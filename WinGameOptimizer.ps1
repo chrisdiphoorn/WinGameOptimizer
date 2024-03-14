@@ -12,7 +12,7 @@
 
 	# This is usefull to ensure the script has some resiliency and does not jump to any conclusions too quickly...
 	$Sleep_Milliseconds = 100 
-    $BigSleep_Milliseconds = 1000
+	$BigSleep_Milliseconds = 1000
 	
 	#This is the LogFile that is used to undo the last run
 	$LogName = "WinGameOptimizer.log"
@@ -368,9 +368,10 @@
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
 		return $result
 	}	
+	
 	Function Trim-HardDrives {
 		
-		$trim=(Optimize-Volume -DriveLetter C -ReTrim)
+		$runtrim=(Optimize-Volume -DriveLetter C -ReTrim)
 		
 	}
 	
@@ -983,6 +984,46 @@
 		
 	}
 	
+	Function Update-Registry-Value {
+
+		param (
+			[parameter(Mandatory=$true)] [ValidateNotNullOrEmpty()]$Path,
+			[parameter(Mandatory=$true)] [ValidateNotNullOrEmpty()]$Name,
+			[parameter(Mandatory=$false)] $Type,
+			[parameter(Mandatory=$true)] [ValidateNotNullOrEmpty()]$Value )
+		
+		$regName = $False
+		$regPath = $False
+		
+		try { 
+			$Value =(Get-Item -Path $Path -ErrorAction SilentlyContinue)
+			$regPath = $true
+		} catch {}
+		
+		if($regPath -eq $true) {
+			try {
+				$Value =(Get-ItemProperty -Path $Path -Name $Name -ErrorAction SilentlyContinue)
+				#Get-ItemProperty -Path $Path | Select-Object -ExpandProperty $Value -ErrorAction Stop | Out-Null }
+				$regName = $true
+			} catch {}
+			if($regName -eq $true) {
+					$set=(Set-Itemproperty -path $Path -Name $Name -value $Value -ErrorAction SilentlyContinue)
+			}
+			if($regName -eq $False) {
+				if($Type) {
+					try {
+						$set=(New-ItemProperty -Path $Path -Name $Name -Value $Value -PropertyType $Type -ErrorAction SilentlyContinue)
+					} catch {}
+				} else {
+					try {
+						$set=(New-ItemProperty -Path $Path -Name $Name -Value $Value -ErrorAction SilentlyContinue)
+					} catch {}
+					
+				}
+			}
+		}
+	}
+	
 	Function Remove-InternetExplorer {
 		
 		#If 21H1
@@ -996,99 +1037,66 @@
 	Function Remove-App-RegistryEntries {
 
 		# Advertiser Id
-		$RegistryPath = (Get-Item -Path Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo)
-		IF($RegistryPath) {
-			Set-ItemProperty -Path  $RegistryPath.name -Name "Enabled" -Value "0"
-		}
+		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo" -Name "Enabled" -Value "0"
+		
 		# Chat
-		$RegistryPath = (Get-Item -Path Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced)
-		IF($RegistryPath) {
-			Set-ItemProperty -Path $RegistryPath.name -Name "TaskbarMn" -Value "0"
-		}
+		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarMn" -Value "0"
+		
 		# Edge Desktop Search Bar
-		$RegistryPath = (Get-Item -Path Registry::HKLM\SOFTWARE\Policies\Microsoft\Edge)
-		IF($RegistryPath) {
-			Set-ItemProperty -Path $RegistryPath.name -Name "WebWidgetAllowed" -Value "0" | Out-Null
-		}
+		Update-Registry-Value -Path "HKLM\SOFTWARE\Policies\Microsoft\Edge" -Name "WebWidgetAllowed" -Value "0"
+		
 		# EdgeRecommendations
-		$RegistryPath = Get-Item -Path Registry::HKLM\SOFTWARE\Policies\Microsoft\Edge | Out-Null
-		IF($RegistryPath) {
-			Set-ItemProperty -Path $RegistryPath.name -Name "ShowRecommendationsEnabled" -Value "0" | Out-Null
-		}
+		Update-Registry-Value -Path "HKLM\SOFTWARE\Policies\Microsoft\Edge" -Name "ShowRecommendationsEnabled" -Value "0"
+		
 		# Hide File Extension
-		Set-ItemProperty -Path "Registry::HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced"`
-                 -Name "HideFileExt"`
-                 -Value "0"
+		Update-Registry-Value -Path "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "HideFileExt" -Value "0"
+		
 		# RotatingLockScreenOverlay
-		Set-ItemProperty -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"`
-                 -Name "RotatingLockScreenOverlayEnabled"`
-                 -Value "0"
+		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "RotatingLockScreenOverlayEnabled" -Value "0"
 				 
 		# SubscribedContent-338387Enabled
-		Set-ItemProperty -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"`
-                 -Name "SubscribedContent-338387Enabled"`
-                 -Value "0"
+		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "SubscribedContent-338387Enabled" -Value "0"
 		
 		# PowershellUnrestricted
-		# Set-ItemProperty -Path "Registry::HKLM\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell"`
-        #         -Name "ExecutionPolicy"`
-        #         -Value "Unrestricted"		
+		# Update-Registry-Value -Path "HKLM\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell" -Name "ExecutionPolicy" -Value "Unrestricted"
 		
 		#StartupBoost
-		$RegistryPath = (Get-Item -Path Registry::HKLM\SOFTWARE\Policies\Microsoft\Edge)
-		IF($RegistryPath) {
-			Set-ItemProperty -Path $RegistryPath.name -Name "StartupBoostEnabled" -Value "0" | Out-Null
-		}
+		Update-Registry-Value -Path "HKLM\SOFTWARE\Policies\Microsoft\Edge" -Name "StartupBoostEnabled" -Value "0"
+		
 		#StartMenuRecommendations
-		$RegistryPath = (Get-Item -Path Registry::HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer)
-		IF($RegistryPath) {
-			Set-ItemProperty -Path $RegistryPath.name -Name "HideRecommendedSection" -Value "1" | Out-Null
-		}
+		Update-Registry-Value -Path "HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer" -Name "HideRecommendedSection" -Value "1"
+		
 		# TaskBar search
-		Set-ItemProperty -Path "Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Search"`
-                 -Name "SearchboxTaskbarMode"`
-                 -Value "0"
+		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Value "0"
+		
 		# TaskView
-		Set-ItemProperty -Path "Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"`
-                 -Name "ShowTaskViewButton"`
-                 -Value "0"
+		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowTaskViewButton" -Value "0"
+
 		# Startmenu Web search
-		$RegistryPath = (Get-Item -Path Registry::HKCU\SOFTWARE\Policies\Microsoft\Windows\Explorer)
-		IF($RegistryPath) {
-			Set-ItemProperty -Path $RegistryPath.name -Name "DisableSearchBoxSuggestions" -Value "1" | Out-Null
-		}
+	
+		Update-Registry-Value -Path "HKCU\SOFTWARE\Policies\Microsoft\Windows\Explorer" -Name "DisableSearchBoxSuggestions" -Value "1"
+		
 		# Widgets
-		Set-ItemProperty -Path "Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"`
-                 -Name "TaskbarDa"`
-                 -Value "0"
+		Update-Registry-Value -Path "Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value "0"
+		
 		# No Customize This folder
-		Set-ItemProperty -Path "Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer"`
-                 -Name "NoCustomizeThisFolder"`
-                 -Value "1"
+		Update-Registry-Value -Path "Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoCustomizeThisFolder" -Value "1"
+		
 		# Allow Dev
-		Set-ItemProperty -Path "Registry::HKLM\SOFTWARE\Policies\Microsoft\Windows\Appx"`
-                 -Name "AllowDevelopmentWithoutDevLicense"`
-                 -Value "1"
+		Update-Registry-Value -Path "Registry::HKLM\SOFTWARE\Policies\Microsoft\Windows\Appx" -Name "AllowDevelopmentWithoutDevLicense" -Value "1"
+		
 		#Remove Edge Bing Sidebar
-		$RegistryPath = (Get-Item -Path Registry::HKLM\SOFTWARE\Policies\Microsoft\Edge)
-		IF($RegistryPath) {
-			Set-ItemProperty -Path $RegistryPath.name -Name "HubsSidebarEnabled" -Value "0" | Out-Null
-		}
+		Update-Registry-Value -Path "HKLM\SOFTWARE\Policies\Microsoft\Edge" -Name "HubsSidebarEnabled" -Value "0"
+		
 		#ExplorerClassicMenu				 
 		#ON# New-Item -Path "Registry::HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -Value ""
 		#OFF# Remove-Item -Path "Registry::HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32"
 		
 		#Explorer Give access
-		#Set-ItemProperty -Path "Registry::HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked"`
-        #         -Name "{f81e9010-6ea4-11ce-a7ff-00aa003ca9f6}"`
-        #         -PropertyType "String"`
-        #         -Value ""
+		# Update-Registry-Value -Path "Registry::HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked" -Name "{f81e9010-6ea4-11ce-a7ff-00aa003ca9f6}" -Type "String" -Value ""
 				 
 		#Remove OfficeCloud Files in Explorer = asking to Sign In
-		$RegistryPath = (Get-Item -Path Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer)
-		IF($RegistryPath) {
-			Set-ItemProperty -Path $RegistryPath.name -Name "ShowCloudFilesInQuickAccess" -Value "0" | Out-Null
-		}
+		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" -Name "ShowCloudFilesInQuickAccess" -Value "0"
 		
 	}
 	
@@ -1107,17 +1115,17 @@
 				Start-Sleep -Milliseconds $Sleep_Milliseconds	
 
 				try {
-						Stop-Service -Name "$($service)" -Force -NoWait | Out-Null
-						Start-Sleep -Milliseconds $Sleep_Milliseconds
+						Stop-Service -Name "$($service)" -Force -NoWait 
+						
 				} catch {
 						write-output -f red "Error: "$_.Exception.Message
 				}
 				try {
-						Set-Service -Name "$($service)" -StartupType Disabled | Out-Null
-						Start-Sleep -Milliseconds $Sleep_Milliseconds
+						Set-Service -Name "$($service)" -StartupType Disabled 
 				} catch {
 						write-output -f red "Error: "$_.Exception.Message
 				}
+				Start-Sleep -Milliseconds $Sleep_Milliseconds
 				$numServices ++
 								
 			}
@@ -1207,7 +1215,7 @@
 			if($services -contains $sname) {
 				if($stype -ne 'Disabled') {
 					$numServices ++
-					$script:FoundServices += $service
+					$script:FoundServices += $sname
 				}
 			}
 		}
@@ -1712,7 +1720,6 @@
 					CreateSystemRestore-Point
 				}
 			
-
 				Remove-PinnedApps
 				$SpoolerDisabled = Disable-PrintSpooler
 							
@@ -1737,8 +1744,8 @@
 				$handleDiff = $hardware.HandleCount - $newHandleCount
 			
 				write-output ""
-				write-output " Removed $($script:FoundApps.count) Apps, $($script:FoundTasks.count) Tasks $($script:FoundServices.Count) Services"
-				write-output " Processes dropped by $handleDiff Handles"
+				write-output " Removed $($script:FoundApps.count) Apps, $($script:FoundTasks.count) Tasks $($script:FoundServices.Count) Services "
+				write-output " Processes dropped by $($handleDiff) Handles"
 			
 				<#
 				
