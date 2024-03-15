@@ -1,4 +1,10 @@
-	# WinGameOptimizer.ps1
+	<# 	WinGameOptimizer.ps1
+		By C.Diphoorn Feb 2024
+	
+		Tested: Microsoft Windows 10 Pro 22H2 (19045.0)
+				Microsoft Windows 11 Pro 22H2 (22621.0)
+				
+	#>
 
 	#Requires -Version 5.1
 
