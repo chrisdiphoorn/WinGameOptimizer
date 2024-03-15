@@ -4,7 +4,7 @@
 
 	Set-StrictMode -Version Latest
 
-	#Import-Module StartLayout
+	Import-Module StartLayout
 	[console]::CursorVisible =$False
 
 	# Ensure TLS 1.2 is enabled for HTTPS traffic
@@ -56,6 +56,7 @@
 			$_OSINFO =[System.Environment]::OSVersion.Version
 			$_OSNAME = (Get-CimInstance Win32_OperatingSystem) | Select-Object Caption
 			$_OSDVER = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion").DisplayVersion
+			
 			if($_OSINFO) {
 				if($OsVersion -eq '') {
 					$OsVersion = $_OSINFO.Major
@@ -65,7 +66,72 @@
 				$OsName = $_OSNAME.Caption
 			}
 			if($_OSDVER) {
-				$OsDisplayVersion = "$_OSDVER ("+$_OSINFO.Major +'.' + $_OSINFO.Minor+"." + $_OSINFO.Build+")"
+				#$_OSINFO.Major+"."  $_OSINFO.Minor+"." 
+				<#
+				Windows NT 3.1							3.10	511	1993-07-27
+				Windows NT 3.5							3.50	807	1994-09-21
+				Windows NT 3.1, Service Pack 3			3.10	528	1994-11
+				Windows NT 3.51							3.51	1057	1995-05-30
+				Windows 95								4.00	950	1995-08-24
+				Windows 95 OEM Service Release 1		4.00	950 A	1996-02-14
+				Windows 95 OEM Service Release 2		4.00	950 B	1996-08-24
+				Windows NT 4.0							4.0		1381	1996-08-24
+				Windows 95 OEM Service Release 2.1		4.00	950 B	1997-08-27
+				Windows 95 OEM Service Release 2.5		4.00	950 C	1997-11-26
+				Windows 98								4.10	1998	1998-05-15
+				Windows 98 Second Edition (SE)			4.10	2222	1999-05-05
+				Windows 2000							5.0		2195	2000-02-17
+				Windows Me								4.90	3000	2000-09-14
+				Windows XP								5.1		2600	2001-10-25
+				Windows XP, Service Pack 1				5.1		2600.1105-1106	2002-09-09
+				Windows Server 2003						5.2		3790	2003-04-24
+				Windows XP, Service Pack 2				5.1		2600.2180	2004-08-25
+				Windows Server 2003, Service Pack 1		5.2		3790.1180	2005-03-30
+				Windows Server 2003 R2					5.2		3790	2005-12-06
+				Windows Vista							6.0		6000	2007-01-30
+				Windows Server 2003, Service Pack 2		5.2		3790	2007-03-13
+				Windows Home Server						5.2		4500	2007-11-04
+				Windows Vista, Service Pack 1			6.0		6001	2008-02-04
+				Windows Server 2008						6.0		6001	2008-02-27
+				Windows XP, Service Pack 3				5.1		2600	2008-04-21
+				Windows Vista, Service Pack 2			6.0		6002	2009-05-26
+				Windows Server 2008, Service Pack 2		6.0		6002	2009-05-26
+				Windows 7								6.1		7600	2009-10-22
+				Windows Server 2008 R2					6.1		7600	2009-10-22
+				Windows 7, Service Pack 1				6.1		7601	2011-02-22
+				Windows Server 2008 R2, Service Pack 1	6.1		7601	2011-02-22
+				Windows Home Server 2011				6.1		8400	2011-04-06
+				Windows Server 2012						6.2		9200	2012-09-04
+				Windows 8								6.2		9200	2012-10-26
+				Windows 8.1								6.3		9600	2013-08-27
+				Windows Server 2012 R2					6.3		9600	2013-10-18
+				Windows 10, Version 1507				10.0	10240	2015-07-29
+				Windows 10, Version 1511				10.0	10586	2015-11-10
+				Windows 10, Version 1607				10.0	14393	2016-08-02
+				Windows Server 2016, Version 1607		10.0	14393	2016-10-15
+				Windows 10, Version 1703				10.0	15063	2017-04-05
+				Windows 10, Version 1709				10.0	16299	2017-10-17
+				Windows 10, Version 1803				10.0	17134	2018-04-30
+				Windows Server 2019, Version 1809		10.0	17763	2018-11-13
+				Windows 10, Version 1809				10.0	17763	2018-11-13
+				Windows Server 2008, Service Pack 2, Rollup KB4489887	6.0	6003	2019-03-19
+				Windows 10, Version 1903				10.0	18362	2019-05-21
+				Windows 10, Version 1909				10.0	18363	2019-11-12
+				Windows Server, Version 1909			10.0	18363	2019-11-12
+				Windows 10, Version 2004				10.0	19041	2020-05-27
+				Windows Server, Version 2004			10.0	19041	2020-05-27
+				Windows 10, Version 20H2				10.0	19042	2020-10-20
+				Windows Server, Version 20H2			10.0	19042	2020-10-20
+				Windows 10, Version 21H1				10.0	19043	2021-05-18
+				Windows Server 2022, Version 21H2		10.0	20348	2021-08-18
+				Windows 11, Version 21H2				10.0	22000	2021-10-04
+				Windows 10, Version 21H2				10.0	19044	2021-11-16
+				Windows 11, Version 22H2				10.0	22621	2022-09-20
+				Windows 10, Version 22H2				10.0	19045	2022-10-18
+				Windows Server, Version 23H2			10.0	25398	2023-10-24
+				Windows 11, Version 23H2				10.0	22631	2023-10-31
+				#>
+				$OsDisplayVersion = "$_OSDVER ("+ $_OSINFO.Build+"."+$_OSINFO.Revision + ")"
 			}
 
 			if($OsName -like "*Server*") {
@@ -371,7 +437,7 @@
 	
 	Function Trim-HardDrives {
 		
-		$runtrim=(Optimize-Volume -DriveLetter C -ReTrim)
+		Optimize-Volume -DriveLetter C -ReTrim
 		
 	}
 	
@@ -631,7 +697,8 @@
 	
 	Function Remove-PinnedApps {
 		
-		$runme= (Get-ChildItem "C:\ProgramData\Microsoft\Windows\Start Menu\Programs" -Recurse  -Filter *uninstall*.lnk | ForEach-Object { Remove-Item $_.FullName })
+		# Remove any Uninstall Shortcut Files
+		$remove = (Get-ChildItem "C:\ProgramData\Microsoft\Windows\Start Menu\Programs" -Recurse  -Filter *uninstall*.lnk | ForEach-Object { Remove-Item $_.FullName })
 						
 		$RemoveItems = @(
 			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Microsoft Edge.lnk"
@@ -644,15 +711,33 @@
 			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Snipping Tool.lnk"
 			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Steps Recorder.lnk"
 			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Windows Media Player.lnk"
+			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Windows Media Player Legacy.lnk"
 			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\Wordpad.lnk"
 			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\XPS Viewer.lnk"
 			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\System Tools\Character Map.lnk"
 			"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Accessories\System Tools\Windows Server Backup.lnk"
 		)
+		
+		#Remove any files from The StartMenu
 		foreach ($Item in $RemoveItems) {
 			IF([System.IO.File]::Exists($Item) -eq $true) {
 				$remove=(Remove-Item $Item | Out-Null)
 			}
+		}
+		
+		#$list = (Get-StartLayout -LayoutPath $env:APPDATA\Microsoft\Windows\Start Menu\Programs\StartApps.json).StartApps
+		#foreach ($item in $list) {Remove-StartPin -AppID $item.AppID}
+		
+		$PinnedApps = (New-Object -Com Shell.Application).NameSpace('shell:::{4234d49b-0245-4df3-b780-3893943456e1}').Items()
+        foreach ($app in $PinnedApps) {
+			try {
+				$app.Verbs() | Where-Object {$_.Name.replace('&','') -match 'Unpin from Start'} | ForEach-Object {$_.DoIt()}
+			} catch {}
+        }
+		
+		$taskfiles = (Get-ChildItem "$($env:APPDATA)\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\" -Filter *.lnk)
+		foreach ($file in $taskfiles) {
+			$remove=(Remove-Item $file.FullName | Out-Null)
 		}
 		
 	}
@@ -704,6 +789,7 @@
 			Write-Progress "Removing $c Microsoft Apps." -status "$app" -percentComplete $p
 			Start-Sleep -Milliseconds $Sleep_Milliseconds
 			
+			$posOK = $false
 			$isappid = $False
 			$pos = $app.IndexOf(".")
 			$posOK = $app.IndexOf(" .")
@@ -711,7 +797,8 @@
 			
 			if($app -like "*_8weky*" -OR $isappid -eq $True) {
 				try {
-					$remove = (winget uninstall -e --id $app --silent --accept-source-agreements)
+					$remove = (winget uninstall -e $app --silent --accept-source-agreements)
+					write-debug "Uninstall AppID : $app"
 					$numApps ++
 				} catch {}
 			} else {
@@ -720,6 +807,7 @@
 					if ($remove -eq 'Multiple installed packages found matching input criteria. Please refine the input') {
 						$remove = (winget uninstall -e --name $app --exact --silent --accept-source-agreements | Out-Null)
 					}
+					write-debug "Uninstall App : $app"
 					$numApps ++
 				} catch {
 					write-output -f red "Error: "$_.Exception.Message
@@ -816,12 +904,13 @@
 	Function CheckApps {
 		
 		$apps = @(
-					
 			"Microsoft Clipchamp"
 			"Microsoft Edge Update"
 			"Microsoft Edge WebView2 Runtime"
-            "Microsoft.Edge"                  
+            "Microsoft.Edge"
+			"Microsoft.MicrosoftEdge"
             "Cortana"
+			"Narrator"
             "News"
 			"MSN Weather"
             "Get Help"                      
@@ -865,9 +954,13 @@
 			"Microsoft News"
 			"Microsoft Pay"
 			"Spotify Music"
+			"Spotify"
 			"Teams Machine-Wide Installer"
 			"Microsoft Whiteboard"
 			"Windows Voice Recorder"
+			"Get Started"
+			"Voice access"
+			"Windows Back up"
 			
 			#Windows 10
 			"Snip & Sketch"
@@ -875,6 +968,7 @@
 			"Skype"
 			"Paint 3D"
 			"3D Viewer"
+			"3DBuilder"
 			"OneNote for Windows 10"
 			"paint.net"
 			
@@ -888,6 +982,16 @@
 			"HP Desktop Support Utilities"
 			"HP Notifications"
 			"VP9 Video Extensions"
+			
+			"Microsoft.OutlookforWindows_8wekyb3d8bbwe"
+			"7EE7776C.LinkedInforWindows_w1wdnht996qgy"
+			"Microsoft.Windows.Photos_8wekyb3d8bbwe"
+			"SpotifyAB.SpotifyMusic_zpdnekdrzrea0"
+			"AmazonVideo.PrimeVideo_pwbj9vvecjh7j"
+			"BytedancePte.Ltd.TikTok_6yccndn6064se"
+			"Facebook.InstagramBeta_8xx8rvfyw5nnt"
+			"Clipchamp.Clipchamp_yxz26nhyzhsrt"
+			"Microsoft.HEVCVideoExtension_8wekyb3d8bbwe"
 		)
 		
 
@@ -911,6 +1015,9 @@
 		}
 
 		if ($useWinGet -eq $False) {
+
+			write-debug "Downloading winget from 'https://api.github.com/repos/microsoft/winget-cli/releases/latest).assets.browser_download_url'"
+
 			Write-Progress "Downloading and installing WinGet which is used to manage aplications in Windows." 
 			Start-Sleep -Milliseconds $Sleep_Milliseconds
 			$progressPreference = 'silentlyContinue'
@@ -940,7 +1047,10 @@
 			
 			[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new() 
 			$winget= (winget list | winget_outclean |  ConvertFrom-FixedColumnTable |  Sort-Object Id  |  Select-Object Name,Id,@{N='Version';E={$_.Version.Replace("> ","")}},Available,Source )# Version fixup
+			$winget= (winget list | winget_outclean |  ConvertFrom-FixedColumnTable |  Sort-Object Id  |  Select-Object Name,Id )# Version fixup
 			$i = 0
+			Write-Progress "Searching through $c Apps."
+			Start-Sleep -Milliseconds $Sleep_Milliseconds
 			
 			if($winget) {
 				$c = $winget.count
@@ -949,8 +1059,6 @@
 						$AppName = $($app.Name)
 						$i++
 						$p = ($i / $c) * 100
-						Write-Progress "Searching through $c Apps. $([int]$p)% Complete." -Status $AppName -percentComplete $p
-						Start-Sleep -Milliseconds $Sleep_Milliseconds
 			
 						#Part of the ID is missing..... So lets try and remove the crap and add the ID part backon again
 						if($appID -like "*...") {
@@ -963,11 +1071,17 @@
 						}
 						
 						if($apps -contains $AppName) {
+							
 							$script:FoundApps += $appName
 							$numApps ++
+							Write-Progress "Searching through $c Apps. $([int]$p)% Complete." -Status $AppName -percentComplete $p
+							Start-Sleep -Milliseconds $Sleep_Milliseconds
+							
 						} elseif($apps -contains $AppID) {
 							$script:FoundApps += $appID
 							$numApps ++
+							Write-Progress "Searching through $c Apps. $([int]$p)% Complete." -Status $AppID -percentComplete $p
+							Start-Sleep -Milliseconds $Sleep_Milliseconds
 						}
 					}
 			}
@@ -990,7 +1104,12 @@
 			[parameter(Mandatory=$true)] [ValidateNotNullOrEmpty()]$Path,
 			[parameter(Mandatory=$true)] [ValidateNotNullOrEmpty()]$Name,
 			[parameter(Mandatory=$false)] $Type,
-			[parameter(Mandatory=$true)] [ValidateNotNullOrEmpty()]$Value )
+			[parameter(Mandatory=$true)] [ValidateNotNullOrEmpty()]$Value
+		)
+		# Type = 'MultiString', 'Binary', 'DWord', 'QWord', 'String', or 'ExpandString'
+		# Binary : Value = ([byte[]](0x30,0x31,0xFF))
+		# MultiString : Value = @('Value1','Value2','Value3')
+		# ExpandedString : Value = "%windir%"
 		
 		$regName = $False
 		$regPath = $False
@@ -1003,23 +1122,103 @@
 		if($regPath -eq $true) {
 			try {
 				$Value =(Get-ItemProperty -Path $Path -Name $Name -ErrorAction SilentlyContinue)
-				#Get-ItemProperty -Path $Path | Select-Object -ExpandProperty $Value -ErrorAction Stop | Out-Null }
 				$regName = $true
 			} catch {}
 			if($regName -eq $true) {
-					$set=(Set-Itemproperty -path $Path -Name $Name -value $Value -ErrorAction SilentlyContinue)
+					try {
+						$newItem=(Set-Itemproperty -path $Path -Name $Name -value $Value -ErrorAction SilentlyContinue)
+						Write-debug "Update Registry: $($Path)\$($Name) = $($Value)"
+					} catch {
+						Write-debug "Line: $($line)  Error:  $($_.Exception.Message)"
+					}
 			}
-			if($regName -eq $False) {
-				if($Type) {
-					try {
-						$set=(New-ItemProperty -Path $Path -Name $Name -Value $Value -PropertyType $Type -ErrorAction SilentlyContinue)
-					} catch {}
-				} else {
-					try {
-						$set=(New-ItemProperty -Path $Path -Name $Name -Value $Value -ErrorAction SilentlyContinue)
-					} catch {}
-					
-				}
+		}
+	}
+	
+	Function Remove-Registry-Name {
+		param (
+			[parameter(Mandatory=$true)]  [ValidateNotNullOrEmpty()] $Path,
+			[parameter(Mandatory=$true)]  [ValidateNotNullOrEmpty()] $Name
+		)
+		$regName = $False
+				
+		try { 
+			$check = (Get-ItemProperty -Path $Path -Name $Name -ErrorAction SilentlyContinue)
+			if($check) { $regName = $true }
+		} catch {}
+		
+		if($regName -eq $true) {
+			try {
+				$DeleteItem = (Remove-ItemProperty -Path $Path -Name $Name -Force -ErrorAction SilentlyContinue)
+				Write-debug "Remove Registry: $($Path)\$($Name)"
+			} catch {
+				$line = $_.InvocationInfo.ScriptLineNumber
+				Write-debug "Line: $($line)  Error:  $($_.Exception.Message)"
+			}
+		}
+		
+	}
+	
+	Function New-Registry-Value {
+
+		param (
+			[parameter(Mandatory=$true)]  [ValidateNotNullOrEmpty()] $Path,
+			[parameter(Mandatory=$true)]  [ValidateNotNullOrEmpty()] $Name,
+			[parameter(Mandatory=$false)] [ValidateNotNullOrEmpty()] $Type,
+			[parameter(Mandatory=$true)]  [ValidateNotNullOrEmpty()] $Value
+		)
+		# Type = 'MultiString', 'Binary', 'DWord', 'QWord', 'String', or 'ExpandString'
+		# DWord, QWord : Value = 1
+		# Binary : Value = ([byte[]](0x30,0x31,0xFF))
+		# MultiString : Value = @('Value1','Value2','Value3')
+		# ExpandedString : Value = "%windir%"
+		
+		$regName = $False
+		$regPath = $False
+				
+		try { 
+			$check = (Get-Item -Path $Path -ErrorAction SilentlyContinue)
+			if($check) { $regPath = $true }
+		} catch {}
+		
+		# Create the new path if it does not exist
+		if($regPath -eq $false) {
+			try {
+				$new = (New-Item -Path $Path -ErrorAction SilentlyContinue)
+			} catch {
+				$line = $_.InvocationInfo.ScriptLineNumber
+				Write-debug "Line: $($line)  Error:  $($_.Exception.Message)"
+			}
+		}
+		
+		# Check to see if the Name exists
+		try {
+				$check = (Get-ItemProperty -Path $Path -Name $Name -ErrorAction SilentlyContinue)
+				if($check) { $regName = $true }
+		} catch {
+			$line = $_.InvocationInfo.ScriptLineNumber
+			Write-debug "Line: $($line)  Error:  $($_.Exception.Message)"
+		}
+		
+		# If the Name Does NOT Exist then Created it 
+		if($regName -eq $false) {
+			try {
+				$NewItem = (New-ItemProperty -Path $Path -Name $Name -Value $Value -PropertyType $Type -ErrorAction SilentlyContinue)
+				Write-debug "New Registry: $($Path)\$($Name) = $($Value)"
+			} catch {
+				$line = $_.InvocationInfo.ScriptLineNumber
+				Write-debug "Line: $($line)  Error:  $($_.Exception.Message)"
+			}
+		}
+		
+		#If the Name Does Exist then update the value 
+		if($regName -eq $true) {
+			try {
+				$NewItem = (Set-ItemProperty -Path $Path -Name $Name -Value $Value -ErrorAction SilentlyContinue)
+				Write-debug "Update Registry: $($Path)\$($Name) = $($Value)"
+			} catch {
+				$line = $_.InvocationInfo.ScriptLineNumber
+				Write-debug "Line: $($line)  Error:  $($_.Exception.Message)"
 			}
 		}
 	}
@@ -1036,68 +1235,95 @@
 	
 	Function Remove-App-RegistryEntries {
 
-		# Advertiser Id
-		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo" -Name "Enabled" -Value "0"
+		# THIS Disables Privacy Settings Experience
+		New-Registry-Value -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OOBE" -Name "DisablePrivacyExperience" -Value "1"
 		
-		# Chat
-		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarMn" -Value "0"
+		# Advertiser Id
+		New-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo" -Name "Enabled" -Value "0"
 		
 		# Edge Desktop Search Bar
-		Update-Registry-Value -Path "HKLM\SOFTWARE\Policies\Microsoft\Edge" -Name "WebWidgetAllowed" -Value "0"
+		New-Registry-Value -Path "HKLM:\SOFTWARE\Policies\Microsoft\Edge" -Name "WebWidgetAllowed" -Value "0"
 		
 		# EdgeRecommendations
-		Update-Registry-Value -Path "HKLM\SOFTWARE\Policies\Microsoft\Edge" -Name "ShowRecommendationsEnabled" -Value "0"
-		
-		# Hide File Extension
-		Update-Registry-Value -Path "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "HideFileExt" -Value "0"
+		New-Registry-Value -Path "HKLM:\SOFTWARE\Policies\Microsoft\Edge" -Name "ShowRecommendationsEnabled" -Value "0"
 		
 		# RotatingLockScreenOverlay
-		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "RotatingLockScreenOverlayEnabled" -Value "0"
+		Update-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "RotatingLockScreenOverlayEnabled" -Value "0"
 				 
 		# SubscribedContent-338387Enabled
-		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "SubscribedContent-338387Enabled" -Value "0"
+		New-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "SubscribedContent-338387Enabled" -Value "0"
 		
-		# PowershellUnrestricted
-		# Update-Registry-Value -Path "HKLM\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell" -Name "ExecutionPolicy" -Value "Unrestricted"
-		
+		# Recenelty Used Apps 
+		Update-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "SystemPaneSuggestionsEnabled" -Value "0"
+
 		#StartupBoost
-		Update-Registry-Value -Path "HKLM\SOFTWARE\Policies\Microsoft\Edge" -Name "StartupBoostEnabled" -Value "0"
+		Update-Registry-Value -Path "HKLM:\SOFTWARE\Policies\Microsoft\Edge" -Name "StartupBoostEnabled" -Value "0"
 		
 		#StartMenuRecommendations
-		Update-Registry-Value -Path "HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer" -Name "HideRecommendedSection" -Value "1"
+		Update-Registry-Value -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Explorer" -Name "HideRecommendedSection" -Value "1"
+		
+		# Disable Cortana
+		New-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Search" -Name "CortanaConsent" -Type "DWord" -Value "0"
+		
+		# Disable BingSearch
+		New-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Search" -Name "BingSearchEnabled" -Type "DWord" -Value "0" 
 		
 		# TaskBar search
-		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Value "0"
+		New-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Type "DWord" -Value "0"
 		
-		# TaskView
-		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowTaskViewButton" -Value "0"
-
+		# Disable TaskView
+		New-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowTaskViewButton" -Type "DWord" -Value "0"
+				
+		New-Registry-Value -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\EdgeUI" -Name "AllowEdgeSwipe" -Type "DWord" -Value "0"
+		
 		# Startmenu Web search
-	
-		Update-Registry-Value -Path "HKCU\SOFTWARE\Policies\Microsoft\Windows\Explorer" -Name "DisableSearchBoxSuggestions" -Value "1"
-		
-		# Widgets
-		Update-Registry-Value -Path "Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value "0"
-		
-		# No Customize This folder
-		Update-Registry-Value -Path "Registry::HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoCustomizeThisFolder" -Value "1"
-		
-		# Allow Dev
-		Update-Registry-Value -Path "Registry::HKLM\SOFTWARE\Policies\Microsoft\Windows\Appx" -Name "AllowDevelopmentWithoutDevLicense" -Value "1"
+		New-Registry-Value -Path "HKCU:\SOFTWARE\Policies\Microsoft\Windows\Explorer" -Name "DisableSearchBoxSuggestions" -Type "DWord" -Value "1"
 		
 		#Remove Edge Bing Sidebar
-		Update-Registry-Value -Path "HKLM\SOFTWARE\Policies\Microsoft\Edge" -Name "HubsSidebarEnabled" -Value "0"
-		
-		#ExplorerClassicMenu				 
-		#ON# New-Item -Path "Registry::HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -Value ""
-		#OFF# Remove-Item -Path "Registry::HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32"
-		
-		#Explorer Give access
-		# Update-Registry-Value -Path "Registry::HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked" -Name "{f81e9010-6ea4-11ce-a7ff-00aa003ca9f6}" -Type "String" -Value ""
-				 
+		New-Registry-Value -Path "HKLM:\SOFTWARE\Policies\Microsoft\Edge" -Name "HubsSidebarEnabled" -Type "DWord" -Value "0"
+
 		#Remove OfficeCloud Files in Explorer = asking to Sign In
-		Update-Registry-Value -Path "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer" -Name "ShowCloudFilesInQuickAccess" -Value "0"
+		Update-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer" -Name "ShowCloudFilesInQuickAccess" -Value "0"
 		
+		#Remove Windows News Feeds in Taskbar
+		New-Registry-Value -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Feeds" -Name "EnableFeeds" -Type "DWord" -Value "0"
+		
+		#Remove Windows Search from Taskbar
+		New-Registry-Value -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search" -Name "EnableDynamicContentInWSB" -Type "DWord" -Value "0"
+		
+		#Windows 11
+		if($script:isWindows11 = $True) {
+			
+			#Enable Windows Classic Mode 
+			New-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "Start_ShowClassicMode" -Type "DWord" -Value "1"
+		
+			#Taskbar Size : 0=Small, 1=Medium, 2=Large
+			New-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarSi" -Type "DWord" -Value "0"
+		
+			#Taskbar Widgets Disabled 
+			New-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Type "DWord" -Value "0"
+		
+			#Taskbar Aligntment 0 =Left, 1= Center
+			New-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Type "DWord" -Value "1"
+		
+			#Remove Windows Snap Layouts
+			New-Registry-Value -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "EnableSnapAssistFlyout" -Type "DWord" -Value "0"
+		
+			#Disable Chat
+			New-Registry-Value -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarMn" -Type "DWord" -Value "0"
+		}
+		
+		#Remove Pinned Apps
+		Remove-Registry-Name -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband" -Name "FavoritesRemovedChanges"
+		
+		# disable prelaunch. lowers ram usage slightly
+		Update-Registry-Value -Path "HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\Main" -Name "AllowPrelaunch" -Type "DWord" -Value "0"
+		Update-Registry-Value -Path "HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\TabPreloader" -Name "AllowTabPreloading" -Type "DWord" -Value "0"
+		
+		# Prevents "Suggested Applications" returning
+		New-Registry-Value -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent" -Name "DisableWindowsConsumerFeatures" -Type "DWord" -Value "1"
+		
+			
 	}
 	
 	Function Remove-services {
@@ -1105,7 +1331,7 @@
 		$numServices = 0
 		$i = 0
 		$c= $script:FoundServices.count
-		Write-Progress "Disabling $c Services" 
+		Write-Progress "Disabling $c Services." 
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
 		foreach ($service in $script:FoundServices) {
 				$foundservice = $null
@@ -1116,14 +1342,15 @@
 
 				try {
 						Stop-Service -Name "$($service)" -Force -NoWait 
-						
+						Write-debug "Stoped Service : $($service)"
 				} catch {
-						write-output -f red "Error: "$_.Exception.Message
+						write-debug "Error: "$_.Exception.Message
 				}
 				try {
 						Set-Service -Name "$($service)" -StartupType Disabled 
+						Write-debug "Disabled Service : $($service)"
 				} catch {
-						write-output -f red "Error: "$_.Exception.Message
+						write-debug "Error: "$_.Exception.Message
 				}
 				Start-Sleep -Milliseconds $Sleep_Milliseconds
 				$numServices ++
@@ -1203,19 +1430,22 @@
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
 		$AllServices =(Get-Service | Select-Object Name, StartType, Status)
 		$c = $AllServices.count
+		
+		Write-Progress "Searching through $c Services."
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		
 		foreach ($service in $AllServices) {
 			$i++
 			$p = ($i / $AllServices.count) * 100
 			$sname = ($service.Name)
-			Write-Progress "Searching through $c Services. $([int]$p)% Complete." -Status  "$sname" -percentComplete $p
-			Start-Sleep -Milliseconds $Sleep_Milliseconds
-			
 			$stype = ($service.StartType)
 			
 			if($services -contains $sname) {
 				if($stype -ne 'Disabled') {
 					$numServices ++
 					$script:FoundServices += $sname
+					Write-Progress "Searching through $c Services. $([int]$p)% Complete." -Status  "$sname" -percentComplete $p
+					Start-Sleep -Milliseconds $Sleep_Milliseconds
 				}
 			}
 		}
@@ -1235,6 +1465,7 @@
 		$killprocesses = @(
 		"SearchApp"
 		"SearchUI.exe"
+		"BingChattInstaller.exe"
 		)
 		foreach($killme in $killprocesses) {
 			$killl = (taskkill /F /IM $killme | Out-Null)
@@ -1245,37 +1476,39 @@
 		$numTasks = 0
 		$i =0
 		$c = $FoundTasks.count
+		
 		Write-Progress "Removing $c Tasks" 
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		
 		foreach ($task in $script:FoundTasks) {
-			$aTask = $null
+			
 			$parts = $task.split('\')
 			$name = $parts[-1]
 			$path = $parts[0..($parts.length-2)] -join '\'
 			$path += "\"
+			
 			$i++
 			$p = ($i / $script:FoundTasks.count) * 100
 			Write-Progress "Removing Tasks" -Status "$([int]$p)% Complete." -percentComplete $p
+			
 			try {
-				$aTask = (Get-ScheduledTask -TaskName "$($name)" -TaskPath "$($path)" -ErrorAction SilentlyContinue)
-			} catch {}
-			if($aTask -ne $null) {
-				try {
-					$disable=(Disable-ScheduledTask -TaskName "$($name)" -TaskPath "$($path)" -ErrorAction SilentlyContinue)
-				} catch {
-					write-output "Error: "$_.Exception.Message
-				}
-				try {
-					$disable=(Unregister-ScheduledTask -TaskName "$($name)" -TaskPath "$($path)" -Confirm:$false -ErrorAction SilentlyContinue)
-					Start-Sleep -Milliseconds $Sleep_Milliseconds
-					$numTasks ++
-				} catch {
-					write-output "Error: "$_.Exception.Message
-				}
+				$disable=(Disable-ScheduledTask -TaskName "$($name)" -TaskPath "$($path)" -ErrorAction SilentlyContinue)
+				Write-debug "Disabled Scheduled Task : $($path) $($name) "
+			} catch {
+				write-debug "Error: "$_.Exception.Message
+			}
+			try {
+				$disable=(Unregister-ScheduledTask -TaskName "$($name)" -TaskPath "$($path)" -Confirm:$false -ErrorAction SilentlyContinue)
+				Write-debug "Unregsiter Scheduled Task : $($path) $($name) "
+				$numTasks ++
+			} catch {
+				write-debug "Error: "$_.Exception.Message
 			}
 		}
+		
 		Write-Progress -Complete '(unused)'
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
+		
 	}
 	
 	Function CheckTasks {
@@ -1318,6 +1551,9 @@
 		$AllTasks = (Get-ScheduledTask | Select-Object TaskName, TaskPath, State)
 		$c = $AllTasks.count
 		
+		Write-Progress "Searching through $c Tasks."
+		Start-Sleep -Milliseconds $Sleep_Milliseconds
+			
 		foreach ($task in $AllTasks) {
 			#$parts = $task.split('\')
 			#$name = $parts[-1]
@@ -1331,13 +1567,15 @@
 			$tstate = ($task.State)
 			$tpath= ($task.TaskPath)
 			
-			Write-Progress "Searching through $c Tasks. $([int]$p)% Complete." -Status $tname -percentComplete $p
-			Start-Sleep -Milliseconds $Sleep_Milliseconds
+			
 			
 			if($tasks -contains $tname) {
 				if($tstate -ne 'Disabled') { 
 					$numTasks ++	
 					$script:FoundTasks += $tname
+					Write-Progress "Searching through $c Tasks. $([int]$p)% Complete." -Status $tname -percentComplete $p
+					Start-Sleep -Milliseconds $Sleep_Milliseconds
+			
 				}
 			}
 		}
@@ -1724,12 +1962,14 @@
 				$SpoolerDisabled = Disable-PrintSpooler
 							
 				Remove-Services
+				
 				Remove-Apps 
-			
 				Remove-Tasks			
+				
 				Turnoff-Telementary
 				Remove-Spotify
 			    DisableCortana
+				
 				Remove-App-RegistryEntries
 				
 				# Do these steps last
@@ -1737,15 +1977,18 @@
 				$SavedSpace = Clean-WindowsUpdate
 				
 				#Finished
-				#$StartMenuItems = (New-Object -Com Shell.Application).NameSpace('shell:::{4234d49b-0245-4df3-b780-3893943456e1}').Items()
-				
+								
 				$NewHandles = (Get-CimInstance -ClassName Win32_Process -ErrorAction SilentlyContinue| Select-Object -Property Handle, HandleCount)
 				$newHandleCount = ($NewHandles | Measure-Object 'HandleCount' -Sum).Sum
-				$handleDiff = $hardware.HandleCount - $newHandleCount
+				$handleDiff = $hardware.HandleCount - $newHandleCount    # default handles/processes should have decreased
 			
 				write-output ""
 				write-output " Removed $($script:FoundApps.count) Apps, $($script:FoundTasks.count) Tasks $($script:FoundServices.Count) Services "
-				write-output " Processes dropped by $($handleDiff) Handles"
+				if($handleDiff -lt 0) {
+						write-output " Processes Increased by $($handleDiff) Handles?"
+				} else {
+					write-output " Processes Dropped by $($handleDiff) Handles."
+				}
 			
 				<#
 				
@@ -1890,9 +2133,7 @@
 				$objSID = New-Object System.Security.Principal.SecurityIdentifier "S-1-1-0"
 				$EveryOne = $objSID.Translate( [System.Security.Principal.NTAccount]).Value
 	
-				# disable prelaunch. lowers ram usage slightly
-				Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\Main" "AllowPrelaunch" 0
-				Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\MicrosoftEdge\TabPreloader" "AllowTabPreloading" 0
+				
 			
 				taskkill /F /IM SearchUI.exe
 				move "%windir%\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy" "%windir%\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy.bak"
@@ -1941,12 +2182,7 @@
 			New-FolderForced -Path "HKLM:\SOFTWARE\Policies\Microsoft\WindowsStore"
 			Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\WindowsStore" "AutoDownload" 2
 	
-			# Prevents "Suggested Applications" returning
-			New-FolderForced -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent"
-			Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent" "DisableWindowsConsumerFeatures" 1
-	
-			
-	
+				
 			Write-Output "Restarting explorer"
 			Start-Process "explorer.exe"
 	
