@@ -4,7 +4,6 @@
 
 	Set-StrictMode -Version Latest
 
-	Import-Module StartLayout
 	[console]::CursorVisible =$False
 
 	# Ensure TLS 1.2 is enabled for HTTPS traffic
@@ -724,9 +723,6 @@
 				$remove=(Remove-Item $Item | Out-Null)
 			}
 		}
-		
-		#$list = (Get-StartLayout -LayoutPath $env:APPDATA\Microsoft\Windows\Start Menu\Programs\StartApps.json).StartApps
-		#foreach ($item in $list) {Remove-StartPin -AppID $item.AppID}
 		
 		$PinnedApps = (New-Object -Com Shell.Application).NameSpace('shell:::{4234d49b-0245-4df3-b780-3893943456e1}').Items()
         foreach ($app in $PinnedApps) {
@@ -1477,7 +1473,7 @@
 		$i =0
 		$c = $FoundTasks.count
 		
-		Write-Progress "Removing $c Tasks" 
+		Write-Progress "Removing $c Tasks." 
 		Start-Sleep -Milliseconds $Sleep_Milliseconds
 		
 		foreach ($task in $script:FoundTasks) {
@@ -1489,7 +1485,7 @@
 			
 			$i++
 			$p = ($i / $script:FoundTasks.count) * 100
-			Write-Progress "Removing Tasks" -Status "$([int]$p)% Complete." -percentComplete $p
+			Write-Progress "Removing $c Tasks." -Status "$([int]$p)% Complete." -percentComplete $p
 			
 			try {
 				$disable=(Disable-ScheduledTask -TaskName "$($name)" -TaskPath "$($path)" -ErrorAction SilentlyContinue)
@@ -1567,12 +1563,10 @@
 			$tstate = ($task.State)
 			$tpath= ($task.TaskPath)
 			
-			
-			
-			if($tasks -contains $tname) {
+			if($tasks -contains "$($tpath)$($tname)") {
 				if($tstate -ne 'Disabled') { 
 					$numTasks ++	
-					$script:FoundTasks += $tname
+					$script:FoundTasks += "$($tpath)$($tname)"
 					Write-Progress "Searching through $c Tasks. $([int]$p)% Complete." -Status $tname -percentComplete $p
 					Start-Sleep -Milliseconds $Sleep_Milliseconds
 			
